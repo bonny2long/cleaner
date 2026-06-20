@@ -1,0 +1,17 @@
+[project]
+name = "nas-cleaner"
+version = "0.1.0"
+description = "Conservative NAS cleanup planner for Bonny's shared nas-data workflow"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+nas-cleaner = "cleaner.cli:main"
+nas-cleaner-dashboard = "cleaner.server:main"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

@@ -1,0 +1,21 @@
+services:
+  nas-cleaner:
+    build: .
+    container_name: nas-cleaner
+    restart: unless-stopped
+    env_file:
+      - .env.nas
+    environment:
+      PYTHONUNBUFFERED: "1"
+      DATA_ROOT: /app/data
+      CLEANER_MODE: ${CLEANER_MODE:-development}
+      DRY_RUN: ${DRY_RUN:-true}
+      DESTRUCTIVE_ACTIONS_ENABLED: ${DESTRUCTIVE_ACTIONS_ENABLED:-false}
+      MIN_AGE_DAYS: ${MIN_AGE_DAYS:-14}
+      CHECK_INTERVAL_SECONDS: ${CHECK_INTERVAL_SECONDS:-604800}
+      DASHBOARD_HOST: 0.0.0.0
+      DASHBOARD_PORT: 8092
+    volumes:
+      - /mnt/rust-pool:/app/data
+    ports:
+      - "8092:8092"
