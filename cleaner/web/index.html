@@ -1,72 +1,132 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>NAS Cleaner</title>
-  <link rel="stylesheet" href="/styles.css" />
-</head>
-<body>
-  <main class="shell">
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">NAS Cleaner</p>
-        <h1>Cleanup Planning</h1>
-        <p class="subtle">Dry-run view for safe empty folders, leftovers, quarantine holds, and blocked cleanup.</p>
-      </div>
-      <div class="actions">
-        <button id="refreshBtn" type="button">Refresh</button>
-        <button id="dryRunBtn" type="button" class="primary">Run dry plan</button>
-      </div>
-    </header>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NAS Cleaner</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css"
+    />
+  </head>
+  <body>
+    <main class="shell">
+      <nav class="suite-nav" aria-label="NAS suite navigation">
+        <a href="http://localhost:8091" class="suite-nav__tab">
+          <i class="ti ti-inbox" aria-hidden="true"></i> Intake Watcher
+        </a>
+        <a href="http://localhost:5173" class="suite-nav__tab">
+          <i class="ti ti-archive" aria-hidden="true"></i> Archive Assistant
+        </a>
+        <a
+          href="http://localhost:8092"
+          class="suite-nav__tab suite-nav__tab--active"
+          aria-current="page"
+        >
+          <i class="ti ti-sparkles" aria-hidden="true"></i> Cleaner
+        </a>
+      </nav>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">NAS Cleaner</p>
+          <h1>Cleanup Planning</h1>
+          <p class="subtle">
+            Dry-run view for safe empty folders, leftovers, quarantine holds,
+            and blocked cleanup.
+          </p>
+        </div>
+        <div class="actions">
+          <button id="refreshBtn" type="button">Refresh</button>
+          <button id="dryRunBtn" type="button" class="primary">
+            Run dry plan
+          </button>
+        </div>
+      </header>
 
-    <section id="health" class="health">Loading cleaner status...</section>
+      <section id="health" class="health">Loading cleaner status...</section>
 
-    <section class="stats" aria-label="Cleaner counts">
-      <article><span id="countSafe">0</span><small>Safe empty</small></article>
-      <article><span id="countTooNew">0</span><small>Too new</small></article>
-      <article><span id="countReview">0</span><small>Review</small></article>
-      <article><span id="countQuarantine">0</span><small>Quarantine</small></article>
-      <article><span id="countBlocked">0</span><small>Blocked</small></article>
-    </section>
-
-    <section class="path-card">
-      <h2>Shared folders</h2>
-      <dl id="paths"></dl>
-    </section>
-
-    <section class="grid main-grid">
-      <section class="lane success">
-        <div class="lane-title"><h2>Safe Empty Folders</h2><span id="safeBadge">0</span></div>
-        <p class="lane-help">These are dry-run candidates only. Empty-folder removal stays blocked until production gates are deliberately enabled.</p>
-        <div id="safeList" class="cards empty">No safe empty folders found.</div>
+      <section class="stats" aria-label="Cleaner counts">
+        <article>
+          <span id="countSafe">0</span><small>Safe empty</small>
+        </article>
+        <article><span id="countTooNew">0</span><small>Too new</small></article>
+        <article><span id="countReview">0</span><small>Review</small></article>
+        <article>
+          <span id="countQuarantine">0</span><small>Quarantine</small>
+        </article>
+        <article>
+          <span id="countBlocked">0</span><small>Blocked</small>
+        </article>
       </section>
 
-      <section class="lane waiting">
-        <div class="lane-title"><h2>Waiting 14-Day Gate</h2><span id="newBadge">0</span></div>
-        <p class="lane-help">Cleaner waits until candidates are old enough so it does not race active moves or fresh tests.</p>
-        <div id="newList" class="cards empty">No too-new items.</div>
+      <details class="path-card">
+        <summary class="path-card__toggle">
+          <h2>System config</h2>
+          <span class="path-card__toggle-hint">click to expand</span>
+        </summary>
+        <dl id="paths"></dl>
+      </details>
+
+      <section class="grid main-grid">
+        <section class="lane success">
+          <div class="lane-title">
+            <h2>Safe Empty Folders</h2>
+            <span id="safeBadge">0</span>
+          </div>
+          <p class="lane-help">
+            These are dry-run candidates only. Empty-folder removal stays
+            blocked until production gates are deliberately enabled.
+          </p>
+          <div id="safeList" class="cards empty">
+            No safe empty folders found.
+          </div>
+        </section>
+
+        <section class="lane waiting">
+          <div class="lane-title">
+            <h2>Waiting 14-Day Gate</h2>
+            <span id="newBadge">0</span>
+          </div>
+          <p class="lane-help">
+            Cleaner waits until candidates are old enough so it does not race
+            active moves or fresh tests.
+          </p>
+          <div id="newList" class="cards empty">No too-new items.</div>
+        </section>
+
+        <section class="lane warning">
+          <div class="lane-title">
+            <h2>Leftovers Need Review</h2>
+            <span id="reviewBadge">0</span>
+          </div>
+          <p class="lane-help">
+            Non-empty leftovers stay visible. MVP never deletes them.
+          </p>
+          <div id="reviewList" class="cards empty">
+            No leftovers needing review.
+          </div>
+        </section>
       </section>
 
-      <section class="lane warning">
-        <div class="lane-title"><h2>Leftovers Need Review</h2><span id="reviewBadge">0</span></div>
-        <p class="lane-help">Non-empty leftovers stay visible. MVP never deletes them.</p>
-        <div id="reviewList" class="cards empty">No leftovers needing review.</div>
-      </section>
-    </section>
+      <section class="grid lower lower-grid">
+        <section class="lane danger">
+          <div class="lane-title">
+            <h2>Blocked by Safety</h2>
+            <span id="blockedBadge">0</span>
+          </div>
+          <div id="blockedList" class="cards empty">No blocked items.</div>
+        </section>
 
-    <section class="grid lower lower-grid">
-      <section class="lane danger">
-        <div class="lane-title"><h2>Blocked by Safety</h2><span id="blockedBadge">0</span></div>
-        <div id="blockedList" class="cards empty">No blocked items.</div>
+        <section class="lane">
+          <div class="lane-title">
+            <h2>Quarantine / Protected / Recent Reports</h2>
+            <span id="eventBadge">0</span>
+          </div>
+          <div id="eventList" class="events empty">No reports yet.</div>
+        </section>
       </section>
-
-      <section class="lane">
-        <div class="lane-title"><h2>Quarantine / Protected / Recent Reports</h2><span id="eventBadge">0</span></div>
-        <div id="eventList" class="events empty">No reports yet.</div>
-      </section>
-    </section>
-  </main>
-  <script src="/app.js"></script>
-</body>
+    </main>
+    <script src="/app.js"></script>
+  </body>
 </html>

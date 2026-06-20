@@ -1,5 +1,11 @@
-const el = (id) => document.getElementById(id);
+﻿const el = (id) => document.getElementById(id);
 
+function setCount(id, value, color) {
+  const span = el(id);
+  if (!span) return;
+  span.textContent = value;
+  span.style.color = value > 0 && color ? color : "";
+}
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -94,11 +100,11 @@ async function loadDashboard() {
       ? "Cleaner is running in dry-run mode. Some items are blocked by safety gates."
       : "Cleaner is running in dry-run mode. No unsafe cleanup action is enabled.";
 
-    el("countSafe").textContent = safe.length;
-    el("countTooNew").textContent = tooNew.length;
-    el("countReview").textContent = review.length;
-    el("countQuarantine").textContent = quarantine.length;
-    el("countBlocked").textContent = blocked.length;
+    setCount("countSafe", safe.length, "#10B981");
+    setCount("countTooNew", tooNew.length, "#f59e0b");
+    setCount("countReview", review.length, null);
+    setCount("countQuarantine", quarantine.length, null);
+    setCount("countBlocked", blocked.length, "#ef4444");
 
     el("safeBadge").textContent = safe.length;
     el("newBadge").textContent = tooNew.length;
