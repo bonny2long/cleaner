@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -12,21 +12,22 @@
   </head>
   <body>
     <main class="shell">
-      <nav class="suite-nav" aria-label="NAS suite navigation">
-        <a href="http://localhost:8091" class="suite-nav__tab">
-          <i class="ti ti-inbox" aria-hidden="true"></i> Intake Watcher
-        </a>
-        <a href="http://localhost:5173" class="suite-nav__tab">
-          <i class="ti ti-archive" aria-hidden="true"></i> Archive Assistant
-        </a>
-        <a
-          href="http://localhost:8092"
-          class="suite-nav__tab suite-nav__tab--active"
-          aria-current="page"
-        >
-          <i class="ti ti-sparkles" aria-hidden="true"></i> Cleaner
-        </a>
-      </nav>
+      <header class="suite-header" aria-label="NAS suite header">
+        <nav class="suite-nav" aria-label="NAS suite navigation">
+          <a href="http://localhost:8091" class="suite-nav__tab">
+            <i class="ti ti-inbox" aria-hidden="true"></i> Intake Watcher
+          </a>
+          <a href="http://localhost:5173" class="suite-nav__tab">
+            <i class="ti ti-archive" aria-hidden="true"></i> Archive Assistant
+          </a>
+          <a href="http://localhost:8092" class="suite-nav__tab suite-nav__tab--active" aria-current="page">
+            <i class="ti ti-sparkles" aria-hidden="true"></i> Cleaner
+          </a>
+        </nav>
+        <div class="suite-brand" aria-label="Bonny NAS">
+          <img src="/assets/bm-nas-mark.svg" alt="Bonny NAS" class="suite-brand__logo" />
+        </div>
+      </header>
       <header class="topbar">
         <div>
           <p class="eyebrow">NAS Cleaner</p>

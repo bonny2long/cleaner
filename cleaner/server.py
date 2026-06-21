@@ -107,9 +107,24 @@ class CleanerHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_web_asset(self, request_path: str) -> bool:
+        static = request_path.lstrip("/")
+        if not static.startswith("assets/"):
+            return False
+
+        assets_root = (WEB_DIR / "assets").resolve()
+        asset_path = (WEB_DIR / static).resolve()
+        if assets_root not in asset_path.parents or not asset_path.is_file():
+            self.send_error(HTTPStatus.NOT_FOUND, "Asset not found")
+            return True
+
+        self._send_file(asset_path)
+        return True
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
         path = parsed.path
+        if self._send_web_asset(path):
+            return
         if path == "/api/health":
             self._send_json({"ok": True, "service": "nas-cleaner"})
             return
