@@ -69,7 +69,9 @@ def _scan_area(config: CleanerConfig, area: str, root: Path, now: float) -> list
             continue
         kind = "file" if path.is_file() else "directory"
         file_count, dir_count, total_size, max_mtime, trash_only, hidden_or_sidecar = _dir_stats(path, config)
-        empty = path.is_dir() and file_count == 0 and dir_count == 0
+        # A folder whose whole tree holds no files (only empty disc/sub folders,
+        # e.g. "CD 1" left behind after a move) is empty for cleanup purposes.
+        empty = path.is_dir() and file_count == 0
         age_days = max(0.0, (now - max_mtime) / 86400)
         items.append(
             ScanItem(
