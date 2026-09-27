@@ -42,6 +42,9 @@ button:hover { background: var(--panel-soft); color: var(--text); }
 button:focus-visible { outline: 2px solid var(--good); outline-offset: 2px; }
 button.primary { border-color: rgba(16, 185, 129, 0.4); color: var(--ok); }
 button.primary:hover { background: rgba(16, 185, 129, 0.1); }
+button.danger { border-color: rgba(239, 68, 68, 0.45); color: #ef4444; }
+button.danger:hover:not(:disabled) { background: rgba(239, 68, 68, 0.1); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
 button:disabled { opacity: .5; cursor: not-allowed; }
 .health, .path-card, .lane, .stats article { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: none; }
 .health { padding: 10px 14px; color: var(--muted); }

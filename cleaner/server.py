@@ -12,8 +12,9 @@ from typing import Any
 from urllib.parse import urlparse
 
 from .config import CleanerConfig
+from .executor import CleanerExecutionError, execute_plan, execution_enabled, load_reviewed_plan, write_execution_report
 from .planner import build_plan
-from .reports import read_recent_jsonl, write_plan_report
+from .reports import read_json, read_recent_jsonl, write_plan_report
 
 WEB_DIR = Path(__file__).parent / "web"
 
@@ -66,13 +67,46 @@ def build_dashboard_payload(config: CleanerConfig) -> dict[str, Any]:
             "check_interval_seconds": config.check_interval_seconds,
             "allow_empty_folder_removal": config.allow_empty_folder_removal,
             "allow_leftover_review_moves": config.allow_leftover_review_moves,
+            "execution_enabled": execution_enabled(config),
         },
+        "reviewed_plan": _reviewed_plan_summary(config),
         "counts": plan.counts,
         "items_scanned": plan.items_scanned,
         "evidence_records": plan.evidence_records,
         "lanes": lanes,
         "events": events,
     }
+
+
+def _reviewed_plan_summary(config: CleanerConfig) -> dict[str, Any] | None:
+    latest = read_json(config.cleaner_reports_dir / "latest-plan.json")
+    if not isinstance(latest, dict) or not latest.get("run_id"):
+        return None
+    removable = [
+        item.get("relative_path")
+        for item in latest.get("actions", [])
+        if isinstance(item, dict) and item.get("action") == "remove_empty_folder"
+    ]
+    return {
+        "run_id": latest.get("run_id"),
+        "created_at": latest.get("created_at"),
+        "remove_empty_folder_count": len(removable),
+        "remove_empty_folder_paths": removable,
+    }
+
+
+def run_execution(config: CleanerConfig, run_id: str) -> tuple[HTTPStatus, dict[str, Any]]:
+    if not execution_enabled(config):
+        return HTTPStatus.CONFLICT, {"ok": False, "error": "Execution is disabled by configuration; Cleaner is report-only."}
+    try:
+        reviewed = load_reviewed_plan(config, run_id)
+        plan = build_plan(config)
+        results = execute_plan(config, plan, reviewed)
+    except CleanerExecutionError as exc:
+        return HTTPStatus.BAD_REQUEST, {"ok": False, "error": str(exc)}
+    report_path = write_execution_report(config, plan, run_id, results)
+    removed = [item for item in results if item.get("status") == "removed_empty_folder"]
+    return HTTPStatus.OK, {"ok": True, "removed": len(removed), "results": results, "report_path": report_path}
 
 
 def run_dry_plan(config: CleanerConfig) -> dict[str, Any]:
@@ -147,6 +181,15 @@ class CleanerHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == "/api/run-dry-plan":
             self._send_json(run_dry_plan(self.config))
+            return
+        if parsed.path == "/api/execute":
+            length = int(self.headers.get("Content-Length") or 0)
+            try:
+                body = json.loads(self.rfile.read(length) or b"{}") if length else {}
+            except json.JSONDecodeError:
+                body = {}
+            status, payload = run_execution(self.config, str(body.get("run_id") or ""))
+            self._send_json(payload, status)
             return
         if parsed.path == "/api/ensure-folders":
             self.config.ensure_shared_directories()

@@ -62,6 +62,14 @@ def cmd_status(config: CleanerConfig, _args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_execute(config: CleanerConfig, args: argparse.Namespace) -> int:
+    from .server import run_execution
+
+    _status, payload = run_execution(config, args.run_id)
+    _print_json(payload)
+    return 0 if payload.get("ok") else 1
+
+
 def cmd_serve(config: CleanerConfig, args: argparse.Namespace) -> int:
     from .server import serve
 
@@ -80,6 +88,8 @@ def build_parser() -> argparse.ArgumentParser:
     plan.add_argument("--write-report", action="store_true")
     sub.add_parser("dry-run")
     sub.add_parser("status")
+    execute_parser = sub.add_parser("execute", help="Run allowed actions from a reviewed plan report")
+    execute_parser.add_argument("--run-id", required=True, help="run_id of the written plan you reviewed")
     serve_parser = sub.add_parser("serve")
     serve_parser.add_argument("--host", default=None)
     serve_parser.add_argument("--port", type=int, default=None)
@@ -96,6 +106,7 @@ def main(argv: list[str] | None = None) -> int:
         "plan": cmd_plan,
         "dry-run": cmd_dry_run,
         "status": cmd_status,
+        "execute": cmd_execute,
         "serve": cmd_serve,
     }
     return handlers[args.command](config, args)

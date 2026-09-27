@@ -95,10 +95,15 @@ async function loadDashboard() {
     const protectedItems = lanes.protected || [];
     const events = data.events || [];
 
-    el("health").className = (blocked.length || counts.blocked) ? "health warn" : "health ok";
+    const executionOn = Boolean(config.execution_enabled);
+    const modeText = executionOn
+      ? "Cleaner can remove reviewed empty folders. Everything else stays report-only."
+      : "Cleaner is running in dry-run mode.";
+    el("health").className = executionOn ? "health warn" : ((blocked.length || counts.blocked) ? "health warn" : "health ok");
     el("health").textContent = (blocked.length || counts.blocked)
-      ? "Cleaner is running in dry-run mode. Some items are blocked by safety gates."
-      : "Cleaner is running in dry-run mode. No unsafe cleanup action is enabled.";
+      ? `${modeText} Some items are blocked by safety gates.`
+      : `${modeText} No unsafe cleanup action is enabled.`;
+    renderExecuteButton(executionOn, data.reviewed_plan);
 
     setCount("countSafe", safe.length, "#10B981");
     setCount("countTooNew", tooNew.length, "#f59e0b");
@@ -132,6 +137,58 @@ async function loadDashboard() {
   }
 }
 
+let reviewedPlan = null;
+
+function renderExecuteButton(executionOn, plan) {
+  const button = el("executeBtn");
+  el("dryRunBtn").textContent = executionOn ? "Write plan to review" : "Run dry plan";
+  reviewedPlan = plan || null;
+  const count = plan ? plan.remove_empty_folder_count || 0 : 0;
+  button.hidden = !executionOn;
+  button.disabled = !executionOn || count === 0;
+  button.textContent = count ? `Remove ${count} empty folder${count === 1 ? "" : "s"}` : "Remove empty folders";
+  button.title = count
+    ? `From reviewed plan ${plan.run_id}`
+    : "Write a plan first. Only folders listed in that plan can be removed.";
+}
+
+async function runExecute() {
+  if (!reviewedPlan) return;
+  const paths = reviewedPlan.remove_empty_folder_paths || [];
+  const confirmed = window.confirm(
+    [
+      `Remove these ${paths.length} empty folder(s) from plan ${reviewedPlan.run_id}?`,
+      "",
+      ...paths,
+      "",
+      "Only folders that are still empty right now are removed. Files are never deleted.",
+    ].join(String.fromCharCode(10))
+  );
+  if (!confirmed) return;
+  const button = el("executeBtn");
+  button.disabled = true;
+  button.textContent = "Removing...";
+  try {
+    const response = await fetch("/api/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ run_id: reviewedPlan.run_id }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || `HTTP ${response.status}`);
+    const refused = (result.results || []).filter((item) => item.status === "refused").length;
+    el("health").className = "health ok";
+    el("health").textContent = `Removed ${result.removed} empty folder(s).`
+      + (refused ? ` ${refused} refused by safety checks.` : "")
+      + ` Report: ${result.report_path}`;
+    await runDryPlan();
+  } catch (err) {
+    el("health").className = "health warn";
+    el("health").textContent = `Cleanup failed: ${err.message}`;
+    await loadDashboard();
+  }
+}
+
 async function runDryPlan() {
   const button = el("dryRunBtn");
   button.disabled = true;
@@ -145,11 +202,12 @@ async function runDryPlan() {
     el("health").textContent = `Dry-run failed: ${err.message}`;
   } finally {
     button.disabled = false;
-    button.textContent = "Run dry plan";
+    if (button.textContent === "Writing report...") button.textContent = "Run dry plan";
   }
 }
 
 el("refreshBtn").addEventListener("click", loadDashboard);
 el("dryRunBtn").addEventListener("click", runDryPlan);
+el("executeBtn").addEventListener("click", runExecute);
 loadDashboard();
 setInterval(loadDashboard, 30000);
