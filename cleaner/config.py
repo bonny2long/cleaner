@@ -88,7 +88,7 @@ class CleanerConfig:
     destructive_actions_enabled: bool = False
     auto_run: bool = False
     check_interval_seconds: int = 7 * 24 * 60 * 60
-    min_age_days: int = 14
+    min_age_days: int = 30
     dashboard_host: str = "127.0.0.1"
     dashboard_port: int = 8092
     allow_empty_folder_removal: bool = False
@@ -114,7 +114,7 @@ class CleanerConfig:
             destructive_actions_enabled=_env_bool("DESTRUCTIVE_ACTIONS_ENABLED", False),
             auto_run=_env_bool("AUTO_RUN", False),
             check_interval_seconds=_env_int("CHECK_INTERVAL_SECONDS", 7 * 24 * 60 * 60),
-            min_age_days=_env_int("MIN_AGE_DAYS", 14),
+            min_age_days=_env_int("MIN_AGE_DAYS", 30),
             dashboard_host=os.getenv("DASHBOARD_HOST", "127.0.0.1"),
             dashboard_port=_env_int("DASHBOARD_PORT", 8092),
             allow_empty_folder_removal=_env_bool("ALLOW_EMPTY_FOLDER_REMOVAL", False),

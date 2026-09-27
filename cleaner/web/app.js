@@ -95,6 +95,7 @@ async function loadDashboard() {
     const protectedItems = lanes.protected || [];
     const events = data.events || [];
 
+    el("gateTitle").textContent = `Waiting ${config.min_age_days ?? 30}-Day Gate`;
     const executionOn = Boolean(config.execution_enabled);
     const modeText = executionOn
       ? "Cleaner can remove reviewed empty folders. Everything else stays report-only."

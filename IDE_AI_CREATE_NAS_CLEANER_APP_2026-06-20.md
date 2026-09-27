@@ -1,3 +1,5 @@
+> **Historical (2026-06-20).** This is the original prompt that created Cleaner. Paths, timings and scope here are out of date. For current behaviour see [README.md](README.md) and the NAS runbook v12.
+
 # IDE AI Prompt — Create NAS Cleaner App in Shared Local NAS System
 
 Use this prompt in the IDE AI inside Bonny's NAS workspace.
