@@ -1,34 +1,32 @@
 # START HERE
 
-This scaffold creates `nas-cleaner`, the third app in Bonny's local NAS workflow.
+Cleaner finds leftovers in the NAS ingest lanes after Archive Assistant moves media, and reports what is safe to clean. By default it is report-only and never deletes anything.
 
-1. Put this project beside the other NAS apps:
-
-```text
-C:\Users\BonnyMakaniankhondo\Documents\GitHub\NAS\nas-cleaner
-```
-
-2. Create `.env` from `.env.example` and set:
-
-```env
-DATA_ROOT=C:/Users/BonnyMakaniankhondo/Documents/GitHub/NAS/nas-data
-```
-
-3. Run:
+1. Set up once:
 
 ```powershell
+Set-Location C:\Dev\NAS\cleaner
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -e .[dev]
-python -m cleaner.cli ensure-folders
-python -m cleaner.cli dry-run
-python -m cleaner.server --host 127.0.0.1 --port 8092
+.\.venv\Scripts\python.exe -m pip install -e .[dev]
+Copy-Item .env.example .env
 ```
 
-4. Open:
+2. In `.env`, point at the shared data root:
 
-```text
-http://127.0.0.1:8092
+```env
+DATA_ROOT=C:/NAS-Local/nas-data
 ```
 
-Cleaner MVP writes reports only. It does not delete files or folders.
+3. Start the dashboard and open http://127.0.0.1:8092:
+
+```powershell
+.\.venv\Scripts\python.exe -m cleaner.server --host 127.0.0.1 --port 8092
+```
+
+4. Run the tests:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+Leftovers must be 30 days old before Cleaner considers them. See [README.md](README.md) for the full timing model, the production gates for empty-folder removal, and known limitations.
