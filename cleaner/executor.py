@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import re
-import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -102,16 +101,6 @@ def _remove_empty_folder(config: CleanerConfig, action: PlannedAction) -> dict:
     }
 
 
-def _move_to_leftover_review(config: CleanerConfig, action: PlannedAction) -> dict:
-    source = Path(action.path)
-    destination = config.leftover_review_dir / source.name
-    if destination.exists():
-        raise CleanerExecutionError(f"Leftover review destination already exists: {destination}")
-    config.leftover_review_dir.mkdir(parents=True, exist_ok=True)
-    shutil.move(str(source), str(destination))
-    return {"action": action.action, "path": action.path, "destination": str(destination), "status": "moved_to_leftover_review"}
-
-
 def load_reviewed_plan(config: CleanerConfig, run_id: str) -> dict[str, Any]:
     """Load a written plan report the user reviewed, refusing stale or odd ids."""
     if not RUN_ID_PATTERN.match(run_id or ""):
@@ -157,20 +146,15 @@ def execute_plan(
     allowed = _reviewed_keys(reviewed)
     results: list[dict] = []
     for action in plan.actions:
-        if action.action not in {"remove_empty_folder", "move_to_leftover_review"}:
+        if action.action != "remove_empty_folder":
             continue
         if allowed is not None and (action.action, action.path, action.category) not in allowed:
             results.append({"action": action.action, "path": action.path, "status": "skipped_not_in_reviewed_plan"})
             continue
         try:
-            if action.action == "remove_empty_folder":
-                if not config.allow_empty_folder_removal:
-                    continue
-                results.append(_remove_empty_folder(config, action))
-            elif action.action == "move_to_leftover_review":
-                if not config.allow_leftover_review_moves:
-                    continue
-                results.append(_move_to_leftover_review(config, action))
+            if not config.allow_empty_folder_removal:
+                continue
+            results.append(_remove_empty_folder(config, action))
         except (CleanerExecutionError, OSError) as exc:
             results.append({"action": action.action, "path": action.path, "status": "refused", "error": str(exc)})
     append_jsonl(

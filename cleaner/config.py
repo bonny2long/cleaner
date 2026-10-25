@@ -19,6 +19,21 @@ DEFAULT_KNOWN_TRASH_SUFFIXES = (
     ".bak",
 )
 
+# CD-rip logs that stay beside a release after Archive Assistant moves the audio.
+DEFAULT_RIP_SIDECAR_SUFFIXES = (
+    ".log",
+    ".cue",
+    ".accurip",
+    ".m3u",
+)
+
+# Matched against the whole file name, ignoring case. "DR8.txt" is a dynamic-range
+# report; a plain "DR*.txt" wildcard would also catch names like "Dracula.txt".
+DEFAULT_RIP_SIDECAR_NAME_PATTERNS = (
+    r"DR\d+\.txt",
+    r"auCDtect\.txt",
+)
+
 SHARED_NAS_FOLDERS = (
     "_INGEST/incoming",
     "_INGEST/intake-processing",
@@ -94,13 +109,14 @@ class CleanerConfig:
     dashboard_host: str = "127.0.0.1"
     dashboard_port: int = 8092
     allow_empty_folder_removal: bool = False
-    allow_leftover_review_moves: bool = False
     allow_quarantine_routing: bool = False
     allow_known_trash_delete: bool = False
     ignore_incoming: bool = True
     ignore_processing: bool = True
     known_trash_names: tuple[str, ...] = DEFAULT_KNOWN_TRASH_NAMES
     known_trash_suffixes: tuple[str, ...] = DEFAULT_KNOWN_TRASH_SUFFIXES
+    rip_sidecar_suffixes: tuple[str, ...] = DEFAULT_RIP_SIDECAR_SUFFIXES
+    rip_sidecar_name_patterns: tuple[str, ...] = DEFAULT_RIP_SIDECAR_NAME_PATTERNS
     cleaner_reports_dir_override: Path | None = None
     leftover_review_dir_override: Path | None = None
     quarantine_dir_override: Path | None = None
@@ -121,7 +137,6 @@ class CleanerConfig:
             dashboard_host=os.getenv("DASHBOARD_HOST", "127.0.0.1"),
             dashboard_port=_env_int("DASHBOARD_PORT", 8092),
             allow_empty_folder_removal=_env_bool("ALLOW_EMPTY_FOLDER_REMOVAL", False),
-            allow_leftover_review_moves=_env_bool("ALLOW_LEFTOVER_REVIEW_MOVES", False),
             allow_quarantine_routing=_env_bool("ALLOW_QUARANTINE_ROUTING", False),
             allow_known_trash_delete=_env_bool("ALLOW_KNOWN_TRASH_DELETE", False),
             ignore_incoming=_env_bool("IGNORE_INCOMING", True),

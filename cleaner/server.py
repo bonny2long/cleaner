@@ -67,7 +67,6 @@ def build_dashboard_payload(config: CleanerConfig) -> dict[str, Any]:
             "min_age_days": config.min_age_days,
             "check_interval_seconds": config.check_interval_seconds,
             "allow_empty_folder_removal": config.allow_empty_folder_removal,
-            "allow_leftover_review_moves": config.allow_leftover_review_moves,
             "execution_enabled": execution_enabled(config),
         },
         "reviewed_plan": _reviewed_plan_summary(config),
