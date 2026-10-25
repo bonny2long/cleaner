@@ -45,6 +45,9 @@
           <button id="executeBtn" type="button" class="danger" hidden>
             Remove empty folders
           </button>
+          <button id="trashBtn" type="button" class="danger" hidden>
+            Move to trash hold
+          </button>
         </div>
       </header>
 
@@ -131,7 +134,8 @@
           <p class="lane-help">
             Every media file in these folders is an exact copy of a file already
             in your library, even though Archive Assistant has no record of the
-            folder. Nothing is removed yet; they wait for the 14-day trash hold.
+            folder. They are never deleted straight away: they move into the
+            recoverable trash hold below.
           </p>
           <div id="duplicateList" class="cards empty">
             No verified duplicates.
@@ -145,8 +149,8 @@
           </div>
           <p class="lane-help">
             Quarantined items you approved for discard in Archive Assistant.
-            Undecided quarantine items are never listed here. Nothing is removed
-            yet; they wait for the 14-day trash hold.
+            Undecided quarantine items are never listed here. They move into the
+            recoverable trash hold once their waiting period is over.
           </p>
           <div id="discardList" class="cards empty">
             No approved discards.
@@ -160,12 +164,32 @@
           </div>
           <p class="lane-help">
             Archive Assistant has no record of these and they are not provable
-            duplicates, so they stay put unless you choose them once the trash
-            hold exists. Check whether one is a download you never scanned.
+            duplicates, so they stay put unless you tick them. Ticked items move
+            to the trash hold, not out of existence. Check whether one is a
+            download you never scanned.
           </p>
           <div id="unrecordedList" class="cards empty">
             No unrecorded leftovers.
           </div>
+        </section>
+      </section>
+
+      <section class="grid">
+        <section class="lane">
+          <div class="lane-title">
+            <h2>Trash Hold</h2>
+            <span id="trashBadge">0</span>
+          </div>
+          <p id="trashHelp" class="lane-help">
+            Items Cleaner moved aside. Restore puts one back exactly where it
+            was. Nothing here is deleted until its hold has expired and you
+            purge it.
+          </p>
+          <div id="trashSummary" class="detail"></div>
+          <div id="trashList" class="cards empty">Nothing is in the trash hold.</div>
+          <button id="purgeBtn" type="button" class="danger" hidden>
+            Purge expired items
+          </button>
         </section>
       </section>
 

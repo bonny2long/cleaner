@@ -51,6 +51,22 @@ the whole folder tree contains no files
 
 Removal uses `rmdir` bottom-up, so a file appearing mid-removal stops it. Every removal is logged with enough detail to recreate the folder.
 
-## Before any further action is enabled
+## The trash hold
 
-Cleaner now recognises verified duplicates, approved quarantine discards and unrecorded leftovers (it reads Archive Assistant's disposition records and compares content with the libraries), but only reports them. Acting on them, and on known junk, stays disabled until Cleaner checks for pending Archive Assistant batches, reads every move record per source folder, and routes removals through a 14-day trash hold that keeps them recoverable.
+Cleaner recognises verified duplicates, approved quarantine discards, unrecorded leftovers and known junk. It only acts on them when `CLEANER_MODE=production`, `DRY_RUN=false`, `DESTRUCTIVE_ACTIONS_ENABLED=true` and `ALLOW_TRASH_HOLD=true` are all set (plus `ALLOW_QUARANTINE_DISCARD` for discards and `ALLOW_KNOWN_TRASH_DELETE` for junk), and then it only **moves the item aside**:
+
+```text
+the action, path and category are in a reviewed plan under 24 hours old
+a fresh plan, built just now, still gives it the same category (duplicates re-proved by SHA-256)
+unrecorded leftovers: you ticked this exact path; discards: the waiting period is over
+the folder has the same file count, total size and newest change as when it was classified
+path is inside _INGEST/ready, _INGEST/failed or _STAGING (or _QUARANTINE/<kind>/<item> for discards),
+  is not a lane root or quarantine container, and contains no link or junction
+the trash folder is on the same disk, and nothing exists at the item's place in the hold
+```
+
+The move is a rename, recorded in `trash-manifest.json` before it happens; nothing is copied, and nothing is overwritten. **Restore** needs no gate and refuses to overwrite. **Purge** is the only deletion: it needs `ALLOW_TRASH_PURGE`, an explicit list from you, an expired hold (`TRASH_HOLD_DAYS`, at least 1), a `in_trash` status, and held files that still match the recorded inventory. Cleaner never purges on its own.
+
+## Still open before enabling it on real data
+
+Cleaner does not yet ask Archive Assistant whether a batch from a folder is still pending review, and keeps one move record per source folder. The hold is recoverable and off by default, and duplicates are proved by content, but review the trash candidates in the dashboard before moving them.

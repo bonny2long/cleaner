@@ -70,6 +70,37 @@ def cmd_execute(config: CleanerConfig, args: argparse.Namespace) -> int:
     return 0 if payload.get("ok") else 1
 
 
+def cmd_trash_move(config: CleanerConfig, args: argparse.Namespace) -> int:
+    from .server import run_trash_move
+
+    _status, payload = run_trash_move(config, args.run_id, list(args.tick or []))
+    _print_json(payload)
+    return 0 if payload.get("ok") else 1
+
+
+def cmd_trash_list(config: CleanerConfig, _args: argparse.Namespace) -> int:
+    from .trash import list_holds
+
+    _print_json({"trash_dir": str(config.trash_dir), "hold_days": config.trash_hold_days, "holds": list_holds(config)})
+    return 0
+
+
+def cmd_restore(config: CleanerConfig, args: argparse.Namespace) -> int:
+    from .server import run_trash_restore
+
+    _status, payload = run_trash_restore(config, args.trash_run, args.relative_path)
+    _print_json(payload)
+    return 0 if payload.get("ok") else 1
+
+
+def cmd_purge(config: CleanerConfig, args: argparse.Namespace) -> int:
+    from .server import run_trash_purge
+
+    _status, payload = run_trash_purge(config, [{"trash_run": args.trash_run, "relative_path": path} for path in args.relative_path])
+    _print_json(payload)
+    return 0 if payload.get("ok") and not any(item.get("status") == "refused" for item in payload.get("results", [])) else 1
+
+
 def cmd_serve(config: CleanerConfig, args: argparse.Namespace) -> int:
     from .server import serve
 
@@ -90,6 +121,16 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("status")
     execute_parser = sub.add_parser("execute", help="Run allowed actions from a reviewed plan report")
     execute_parser.add_argument("--run-id", required=True, help="run_id of the written plan you reviewed")
+    move_parser = sub.add_parser("trash-move", help="Move items of a reviewed plan into the recoverable trash hold")
+    move_parser.add_argument("--run-id", required=True, help="run_id of the written plan you reviewed")
+    move_parser.add_argument("--tick", action="append", help="relative path of an unrecorded leftover you approve (repeatable)")
+    sub.add_parser("trash-list", help="Show what is in the trash hold and when each item expires")
+    restore_parser = sub.add_parser("restore", help="Put a held item back where it came from")
+    restore_parser.add_argument("trash_run")
+    restore_parser.add_argument("relative_path")
+    purge_parser = sub.add_parser("purge", help="Permanently delete expired held items (needs ALLOW_TRASH_PURGE)")
+    purge_parser.add_argument("trash_run")
+    purge_parser.add_argument("relative_path", nargs="+")
     serve_parser = sub.add_parser("serve")
     serve_parser.add_argument("--host", default=None)
     serve_parser.add_argument("--port", type=int, default=None)
@@ -107,6 +148,10 @@ def main(argv: list[str] | None = None) -> int:
         "dry-run": cmd_dry_run,
         "status": cmd_status,
         "execute": cmd_execute,
+        "trash-move": cmd_trash_move,
+        "trash-list": cmd_trash_list,
+        "restore": cmd_restore,
+        "purge": cmd_purge,
         "serve": cmd_serve,
     }
     return handlers[args.command](config, args)

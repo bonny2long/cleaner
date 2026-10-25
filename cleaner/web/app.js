@@ -73,11 +73,24 @@ function renderPaths(config) {
   el("paths").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${escapeHtml(v)}</dd>`).join("");
 }
 
+// Strays are never moved unless ticked. The ticks survive refreshes; they only count when the item is
+// also in the reviewed plan (the server checks that again).
+const ticked = new Set();
+
+function tickBox(action) {
+  if (action.category !== "unrecorded_leftover" || action.action !== "move_to_trash") return "";
+  const inPlan = (reviewedPlan?.trash_candidates || []).some((c) => c.relative_path === action.relative_path);
+  return `<label class="tick"><input type="checkbox" data-tick="${escapeHtml(action.relative_path)}"`
+    + `${ticked.has(action.relative_path) ? " checked" : ""}${inPlan ? "" : " disabled"}> `
+    + `${inPlan ? "Move to trash hold" : "Write a plan to review before ticking"}</label>`;
+}
+
 function card(action) {
   const evidence = action.evidence ? `Evidence: ${action.evidence.manifest_path}` : "No matched evidence";
   return `
     <article class="card">
       <h3>${escapeHtml(action.relative_path || action.path)}</h3>
+      ${tickBox(action)}
       <div class="meta">
         <span>${escapeHtml(action.action || "report_only")}</span>
         <span>${escapeHtml(action.safety_status || "")}</span>
@@ -133,14 +146,19 @@ async function loadDashboard() {
 
     el("gateTitle").textContent = `Waiting ${config.min_age_days ?? 30}-Day Gate`;
     const executionOn = Boolean(config.execution_enabled);
-    const modeText = executionOn
-      ? "Cleaner can remove reviewed empty folders. Everything else stays report-only."
-      : "Cleaner is running in dry-run mode.";
-    el("health").className = executionOn ? "health warn" : ((blocked.length || counts.blocked) ? "health warn" : "health ok");
+    const trashOn = Boolean(config.trash_enabled);
+    reviewedPlan = data.reviewed_plan || null;
+    let modeText = "Cleaner is running in dry-run mode.";
+    if (trashOn) modeText = `Cleaner can move reviewed items into a ${config.trash_hold_days}-day recoverable trash hold. Nothing is deleted.`;
+    else if (executionOn) modeText = "Cleaner can remove reviewed empty folders. Everything else stays report-only.";
+    const cautious = executionOn || trashOn;
+    el("health").className = cautious ? "health warn" : ((blocked.length || counts.blocked) ? "health warn" : "health ok");
     el("health").textContent = (blocked.length || counts.blocked)
       ? `${modeText} Some items are blocked by safety gates.`
       : `${modeText} No unsafe cleanup action is enabled.`;
     renderExecuteButton(executionOn, data.reviewed_plan);
+    renderTrashButton(trashOn);
+    renderTrash(data.trash || {}, config);
 
     setCount("countSafe", safe.length, "#10B981");
     setCount("countTooNew", tooNew.length, "#f59e0b");
@@ -235,6 +253,172 @@ async function runExecute() {
   }
 }
 
+// ---- trash hold ----------------------------------------------------------------------------------------
+
+function trashSelection() {
+  // Duplicates and ready discards go on the plan alone; strays only if ticked.
+  return (reviewedPlan?.trash_candidates || []).filter((c) => !c.needs_tick || ticked.has(c.relative_path));
+}
+
+function renderTrashButton(trashOn) {
+  const button = el("trashBtn");
+  button.hidden = !trashOn;
+  const selection = trashSelection();
+  button.disabled = !trashOn || selection.length === 0;
+  button.textContent = selection.length ? `Move ${selection.length} to trash hold` : "Move to trash hold";
+  button.title = selection.length
+    ? `From reviewed plan ${reviewedPlan.run_id}`
+    : "Write a plan first. Only items in that plan can be moved, and strays also need a tick.";
+}
+
+function holdRow(run, entry, config) {
+  const held = entry.status === "in_trash";
+  const when = held
+    ? (entry.expired ? "hold expired, can be purged" : `${entry.days_left} day(s) left`)
+    : titleCase(entry.status);
+  const restore = held && !entry.missing
+    ? `<button type="button" data-restore="${escapeHtml(entry.relative_path)}" data-run="${escapeHtml(run.run_id)}">Restore</button>`
+    : "";
+  return `
+    <article class="card">
+      <h3>${escapeHtml(entry.relative_path)}</h3>
+      <div class="meta">
+        <span>${escapeHtml(titleCase(entry.category))}</span>
+        <span>${entry.file_count ?? 0} file(s), ${formatBytes(entry.total_bytes)}</span>
+        <span>${escapeHtml(run.run_id)}</span>
+      </div>
+      <span class="status ${held ? (entry.expired ? "warning" : "waiting") : "protected"}">${escapeHtml(when)}</span>
+      ${entry.missing ? '<p class="detail">The held copy is missing from the trash folder.</p>' : ""}
+      ${restore}
+    </article>`;
+}
+
+function renderTrash(trash, config) {
+  const holds = trash.holds || [];
+  const target = el("trashList");
+  const rows = holds.flatMap((run) => (run.entries || []).map((entry) => holdRow(run, entry, config)));
+  el("trashBadge").textContent = trash.items_held || 0;
+  el("trashSummary").textContent = trash.items_held
+    ? `${trash.items_held} item(s), ${formatBytes(trash.bytes_held)} held for ${config.trash_hold_days} days each. ${trash.expired_items || 0} expired.`
+    : "";
+  target.className = rows.length ? "cards" : "cards empty";
+  target.innerHTML = rows.length ? rows.join("") : "Nothing is in the trash hold.";
+  const button = el("purgeBtn");
+  const canPurge = Boolean(config.purge_enabled) && (trash.expired_items || 0) > 0;
+  button.hidden = !config.purge_enabled;
+  button.disabled = !canPurge;
+  button.title = canPurge ? "" : "Only expired items can be purged.";
+}
+
+async function postJson(url, body) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const result = await response.json();
+  if (!response.ok || !result.ok) throw new Error(result.error || `HTTP ${response.status}`);
+  return result;
+}
+
+function say(kind, text) {
+  el("health").className = `health ${kind}`;
+  el("health").textContent = text;
+}
+
+async function runTrashMove() {
+  const selection = trashSelection();
+  if (!reviewedPlan || selection.length === 0) return;
+  const lines = selection.map((c) => `${c.relative_path}  (${c.file_count ?? "?"} files, ${formatBytes(c.total_bytes)})`);
+  const confirmed = window.confirm(
+    [
+      `Move these ${selection.length} item(s) from plan ${reviewedPlan.run_id} into the trash hold?`,
+      "",
+      ...lines,
+      "",
+      "They are moved aside, not deleted, and can be restored until they are purged.",
+      "Anything that changed since the plan was written is skipped.",
+    ].join(String.fromCharCode(10))
+  );
+  if (!confirmed) return;
+  const button = el("trashBtn");
+  button.disabled = true;
+  button.textContent = "Moving...";
+  try {
+    const result = await postJson("/api/trash/move", {
+      run_id: reviewedPlan.run_id,
+      include_paths: selection.map((c) => c.relative_path),
+    });
+    const skipped = (result.results || []).filter((r) => r.status !== "moved_to_trash" && r.status !== "skipped_needs_your_tick");
+    say("ok", `Moved ${result.moved} item(s) to the trash hold.`
+      + (skipped.length ? ` ${skipped.length} skipped or refused by safety checks.` : "")
+      + ` Report: ${result.report_path}`);
+    ticked.clear();
+    await runDryPlan();
+  } catch (err) {
+    say("warn", `Moving to the trash hold failed: ${err.message}`);
+    await loadDashboard();
+  }
+}
+
+async function runRestore(trashRun, relativePath) {
+  if (!window.confirm(`Restore ${relativePath} to where it came from?`)) return;
+  try {
+    const result = await postJson("/api/trash/restore", { trash_run: trashRun, relative_path: relativePath });
+    say("ok", `Restored ${result.restored}.`);
+  } catch (err) {
+    say("warn", `Restore failed: ${err.message}`);
+  }
+  await loadDashboard();
+}
+
+async function runPurge() {
+  const expired = [];
+  try {
+    const data = await (await fetch("/api/trash", { cache: "no-store" })).json();
+    for (const run of data.holds || []) {
+      for (const entry of run.entries || []) {
+        if (entry.status === "in_trash" && entry.expired) expired.push({ trash_run: run.run_id, relative_path: entry.relative_path });
+      }
+    }
+  } catch (err) {
+    say("warn", `Could not read the trash hold: ${err.message}`);
+    return;
+  }
+  if (!expired.length) return;
+  const confirmed = window.confirm(
+    [
+      `Permanently delete these ${expired.length} expired item(s)?`,
+      "",
+      ...expired.map((e) => e.relative_path),
+      "",
+      "This cannot be undone.",
+    ].join(String.fromCharCode(10))
+  );
+  if (!confirmed) return;
+  try {
+    const result = await postJson("/api/trash/purge", { entries: expired });
+    const refused = (result.results || []).filter((r) => r.status === "refused").length;
+    say("ok", `Purged ${result.purged} item(s).` + (refused ? ` ${refused} refused by safety checks.` : ""));
+  } catch (err) {
+    say("warn", `Purge failed: ${err.message}`);
+  }
+  await loadDashboard();
+}
+
+document.addEventListener("change", (event) => {
+  const box = event.target.closest?.("[data-tick]");
+  if (!box) return;
+  if (box.checked) ticked.add(box.dataset.tick);
+  else ticked.delete(box.dataset.tick);
+  renderTrashButton(!el("trashBtn").hidden);
+});
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest?.("[data-restore]");
+  if (button) runRestore(button.dataset.run, button.dataset.restore);
+});
+
 async function runDryPlan() {
   const button = el("dryRunBtn");
   button.disabled = true;
@@ -255,5 +439,7 @@ async function runDryPlan() {
 el("refreshBtn").addEventListener("click", loadDashboard);
 el("dryRunBtn").addEventListener("click", runDryPlan);
 el("executeBtn").addEventListener("click", runExecute);
+el("trashBtn").addEventListener("click", runTrashMove);
+el("purgeBtn").addEventListener("click", runPurge);
 loadDashboard();
 setInterval(loadDashboard, 30000);

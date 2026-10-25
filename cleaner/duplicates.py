@@ -68,7 +68,8 @@ def clear_caches() -> None:
 
 
 def _check_budget(deadline: float | None) -> None:
-    if deadline is not None and time.monotonic() > deadline:
+    # >=, not >: on Windows the clock is coarse, so a zero budget could otherwise still get through.
+    if deadline is not None and time.monotonic() >= deadline:
         raise BudgetExceeded
 
 

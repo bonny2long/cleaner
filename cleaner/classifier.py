@@ -91,7 +91,7 @@ def _classify_discard(config: CleanerConfig, item: ScanItem, context: Classifica
     return Classification(
         "quarantine_discard_approved",
         f"you approved discarding this in Archive Assistant ({record.reason or 'no reason recorded'}); {when}. "
-        "Nothing is removed until the trash hold exists",
+        "At most it moves to the recoverable trash hold, after you review a plan",
         severity="info",
         details=details,
     )
@@ -107,7 +107,7 @@ def _classify_unrecorded(item: ScanItem, context: ClassificationContext, empty_r
         return Classification(
             "verified_duplicate",
             f"all {assessment.content_files} media file(s) are exact copies of files already in the library; "
-            "Archive Assistant has no record of this folder. Nothing is removed until the trash hold exists",
+            "Archive Assistant has no record of this folder. At most it moves to the recoverable trash hold, after you review a plan",
             severity="info",
             details=details,
         )
@@ -175,7 +175,7 @@ def classify_item(
         return Classification(
             "known_harmless_trash",
             "only CD-rip logs (.log, .cue, .accurip, .m3u, DR and auCDtect reports) and other known junk remain; "
-            "Archive Assistant already moved this release. Report only until the trash hold exists",
+            "Archive Assistant already moved this release. At most it moves to the recoverable trash hold, after you review a plan",
             evidence=evidence,
             severity="info",
         )

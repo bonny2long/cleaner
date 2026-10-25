@@ -73,6 +73,8 @@ class PlannedAction:
     severity: str = "info"
     evidence: EvidenceRecord | None = None
     details: dict[str, Any] | None = None
+    # What the folder looked like when it was classified; execution refuses if it changed since.
+    signature: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)

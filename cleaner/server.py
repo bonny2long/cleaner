@@ -12,12 +12,26 @@ from typing import Any
 from urllib.parse import urlparse
 
 from .config import CleanerConfig
-from .executor import CleanerExecutionError, execute_plan, execution_enabled, load_reviewed_plan, write_execution_report
+from .executor import (
+    CleanerExecutionError,
+    execute_plan,
+    execute_trash_plan,
+    execution_enabled,
+    load_reviewed_plan,
+    purge_trash,
+    restore_from_trash,
+    write_execution_report,
+    write_trash_report,
+)
 from .origin_guard import request_allowed
 from .planner import build_plan
 from .reports import read_json, read_recent_jsonl, write_plan_report
+from .trash import TrashError, list_holds, purge_enabled, trash_enabled
 
 WEB_DIR = Path(__file__).parent / "web"
+# Cleanup actions change the disk, so only one runs at a time. A second request is refused,
+# not queued: it would otherwise act on a plan the first one is still changing.
+_ACTION_LOCK = threading.Lock()
 # A refused request's body is read and dropped up to this size; larger ones close the connection.
 MAX_DISCARDED_BODY_BYTES = 8 * 1024 * 1024
 
@@ -87,7 +101,11 @@ def build_dashboard_payload(config: CleanerConfig) -> dict[str, Any]:
             "check_interval_seconds": config.check_interval_seconds,
             "allow_empty_folder_removal": config.allow_empty_folder_removal,
             "execution_enabled": execution_enabled(config),
+            "trash_enabled": trash_enabled(config),
+            "purge_enabled": purge_enabled(config),
+            "trash_hold_days": config.trash_hold_days,
         },
+        "trash": _trash_summary(config),
         "reviewed_plan": _reviewed_plan_summary(config),
         "counts": plan.counts,
         "items_scanned": plan.items_scanned,
@@ -106,12 +124,88 @@ def _reviewed_plan_summary(config: CleanerConfig) -> dict[str, Any] | None:
         for item in latest.get("actions", [])
         if isinstance(item, dict) and item.get("action") == "remove_empty_folder"
     ]
+    trash_candidates = [
+        {
+            "relative_path": item.get("relative_path"),
+            "category": item.get("category"),
+            "needs_tick": item.get("category") == "unrecorded_leftover",
+            "total_bytes": (item.get("signature") or {}).get("total_size_bytes"),
+            "file_count": (item.get("signature") or {}).get("file_count"),
+        }
+        for item in latest.get("actions", [])
+        if isinstance(item, dict) and item.get("action") == "move_to_trash"
+    ]
     return {
         "run_id": latest.get("run_id"),
         "created_at": latest.get("created_at"),
         "remove_empty_folder_count": len(removable),
         "remove_empty_folder_paths": removable,
+        "trash_candidates": trash_candidates,
     }
+
+
+def _trash_summary(config: CleanerConfig) -> dict[str, Any]:
+    holds = list_holds(config)
+    entries = [entry for hold in holds for entry in hold.get("entries", []) if entry.get("status") == "in_trash"]
+    return {
+        "holds": holds,
+        "items_held": len(entries),
+        "bytes_held": sum(int(entry.get("total_bytes") or 0) for entry in entries),
+        "expired_items": sum(1 for entry in entries if entry.get("expired")),
+    }
+
+
+def _busy() -> tuple[HTTPStatus, dict[str, Any]]:
+    return HTTPStatus.CONFLICT, {"ok": False, "error": "Another cleanup action is already running. Wait for it to finish."}
+
+
+def run_exclusive(action, *args: Any) -> tuple[HTTPStatus, dict[str, Any]]:
+    if not _ACTION_LOCK.acquire(blocking=False):
+        return _busy()
+    try:
+        return action(*args)
+    finally:
+        _ACTION_LOCK.release()
+
+
+def run_trash_move(config: CleanerConfig, run_id: str, include_paths: list[str]) -> tuple[HTTPStatus, dict[str, Any]]:
+    """Move the items of a reviewed plan into the trash hold. Nothing is deleted."""
+    if not trash_enabled(config):
+        return HTTPStatus.CONFLICT, {"ok": False, "error": "The trash hold is disabled by configuration; Cleaner is report-only."}
+    try:
+        reviewed = load_reviewed_plan(config, run_id)
+        plan = build_plan(config)  # fresh evidence, and every duplicate re-verified by content
+        trash_run, results = execute_trash_plan(config, plan, reviewed, set(include_paths))
+    except (CleanerExecutionError, TrashError) as exc:
+        return HTTPStatus.BAD_REQUEST, {"ok": False, "error": str(exc)}
+    report_path = write_trash_report(config, trash_run, run_id, results)
+    moved = [item for item in results if item.get("status") == "moved_to_trash"]
+    return HTTPStatus.OK, {
+        "ok": True,
+        "moved": len(moved),
+        "trash_run": trash_run if moved else None,
+        "results": results,
+        "report_path": report_path,
+    }
+
+
+def run_trash_restore(config: CleanerConfig, trash_run: str, relative_path: str) -> tuple[HTTPStatus, dict[str, Any]]:
+    try:
+        entry = restore_from_trash(config, trash_run, relative_path)
+    except (CleanerExecutionError, TrashError, OSError) as exc:
+        return HTTPStatus.BAD_REQUEST, {"ok": False, "error": str(exc)}
+    return HTTPStatus.OK, {"ok": True, "restored": entry.get("relative_path")}
+
+
+def run_trash_purge(config: CleanerConfig, entries: list[dict[str, Any]]) -> tuple[HTTPStatus, dict[str, Any]]:
+    if not purge_enabled(config):
+        return HTTPStatus.CONFLICT, {"ok": False, "error": "Purging is disabled by configuration; held items are kept."}
+    try:
+        purge_id, results = purge_trash(config, entries)
+    except (CleanerExecutionError, TrashError) as exc:
+        return HTTPStatus.BAD_REQUEST, {"ok": False, "error": str(exc)}
+    purged = [item for item in results if item.get("status") == "purged"]
+    return HTTPStatus.OK, {"ok": True, "purged": len(purged), "purge_id": purge_id, "results": results}
 
 
 def run_execution(config: CleanerConfig, run_id: str) -> tuple[HTTPStatus, dict[str, Any]]:
@@ -184,6 +278,15 @@ class CleanerHandler(BaseHTTPRequestHandler):
         if path == "/api/dashboard":
             self._send_json(build_dashboard_payload(self.config))
             return
+        if path == "/api/trash":
+            self._send_json({
+                "ok": True,
+                "trash_enabled": trash_enabled(self.config),
+                "purge_enabled": purge_enabled(self.config),
+                "hold_days": self.config.trash_hold_days,
+                **_trash_summary(self.config),
+            })
+            return
         if path == "/api/plan":
             self._send_json(build_plan(
                 self.config,
@@ -219,6 +322,19 @@ class CleanerHandler(BaseHTTPRequestHandler):
         if length > MAX_DISCARDED_BODY_BYTES:
             self.close_connection = True
 
+    def _read_json_body(self) -> dict[str, Any]:
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            return {}
+        if length <= 0 or length > MAX_DISCARDED_BODY_BYTES:
+            return {}
+        try:
+            data = json.loads(self.rfile.read(length) or b"{}")
+        except json.JSONDecodeError:
+            return {}
+        return data if isinstance(data, dict) else {}
+
     def do_POST(self) -> None:  # noqa: N802
         allowed, reason = request_allowed(
             "POST",
@@ -235,12 +351,27 @@ class CleanerHandler(BaseHTTPRequestHandler):
             self._send_json(run_dry_plan(self.config))
             return
         if parsed.path == "/api/execute":
-            length = int(self.headers.get("Content-Length") or 0)
-            try:
-                body = json.loads(self.rfile.read(length) or b"{}") if length else {}
-            except json.JSONDecodeError:
-                body = {}
-            status, payload = run_execution(self.config, str(body.get("run_id") or ""))
+            body = self._read_json_body()
+            status, payload = run_exclusive(run_execution, self.config, str(body.get("run_id") or ""))
+            self._send_json(payload, status)
+            return
+        if parsed.path == "/api/trash/move":
+            body = self._read_json_body()
+            include = [str(value) for value in body.get("include_paths") or [] if isinstance(value, str)]
+            status, payload = run_exclusive(run_trash_move, self.config, str(body.get("run_id") or ""), include)
+            self._send_json(payload, status)
+            return
+        if parsed.path == "/api/trash/restore":
+            body = self._read_json_body()
+            status, payload = run_exclusive(
+                run_trash_restore, self.config, str(body.get("trash_run") or ""), str(body.get("relative_path") or "")
+            )
+            self._send_json(payload, status)
+            return
+        if parsed.path == "/api/trash/purge":
+            body = self._read_json_body()
+            entries = [item for item in body.get("entries") or [] if isinstance(item, dict)]
+            status, payload = run_exclusive(run_trash_purge, self.config, entries)
             self._send_json(payload, status)
             return
         if parsed.path == "/api/ensure-folders":

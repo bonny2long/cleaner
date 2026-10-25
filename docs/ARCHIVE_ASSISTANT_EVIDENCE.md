@@ -53,4 +53,6 @@ The format is documented in Archive Assistant's `docs/CLEANER_BOUNDARY.md`. Clea
 - the live files still match the record's `inventory` exactly (same names and sizes, nothing added or missing);
 - `MIN_AGE_DAYS` have passed since the decision; before that the item is listed with the date it becomes eligible.
 
+A picked-up discard is only moved into the recoverable trash hold (never deleted directly), and only with `ALLOW_TRASH_HOLD` and `ALLOW_QUARANTINE_DISCARD` on.
+
 Items that fail the inventory check are reported as `quarantine_hold` with the reason. Items nobody decided about are never picked up. `rejected` records are not used yet: a rejected batch's files are reported, not cleaned, because a `rejected` record whose `shared_source_batch_ids` is not empty means a shared folder, not a rejected one.
