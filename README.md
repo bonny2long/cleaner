@@ -35,13 +35,26 @@ Cleaner never deletes files. Its only real action today is removing **empty fold
 | `safe_empty_folder` | Folder tree with no files, backed by a verified Archive Assistant move record | Removable when production gates are on |
 | `known_harmless_trash` | Only junk files such as `Thumbs.db`, `.DS_Store`, `.tmp`, or CD-rip logs (`.log`, `.cue`, `.accurip`, `.m3u`, `DR<n>.txt`, `auCDtect.txt`) left after a verified move | Report only |
 | `uncertain_leftover` | Anything else left behind (sidecars, logs, unmoved media) | Report only |
-| `quarantine_hold` | Anything in `_QUARANTINE` | Never touched |
+| `verified_duplicate` | A folder Archive Assistant has **no record of**, where every media file is a byte-for-byte copy (SHA-256) of a file already in a final library. Cover art, notes, rip logs and known junk may sit beside them | Report only, until the trash hold exists |
+| `unrecorded_leftover` | A folder Archive Assistant has no record of that is not a provable duplicate (a media file not in any library, an unrecognised file type, or only artwork) | Report only. Needs your decision; never picked up on its own |
+| `quarantine_discard_approved` | A quarantined item you approved for discard in Archive Assistant, whose files still match the inventory recorded at that moment | Report only, until the trash hold exists |
+| `quarantine_hold` | Anything else in `_QUARANTINE`, including items nobody decided about | Never touched |
 | `do_not_touch` | Final libraries, Photos, Documents, Projects, Backups, active upload lanes | Never touched |
 | `blocked_too_new` | Younger than `MIN_AGE_DAYS` | Waits |
 | `blocked_by_missing_evidence` | No Archive Assistant move record matches | Waits for evidence |
 | `blocked_by_destination_missing` | Move record exists but the moved files are missing | Flagged as critical |
 
 Cleaner scans `_INGEST/ready`, `_INGEST/leftover-review`, `_INGEST/failed`, `_STAGING` and `_QUARANTINE`. It ignores `_INGEST/incoming` and `_INGEST/intake-processing`, which belong to Intake Watcher.
+
+### What Cleaner picks up beyond empty folders
+
+Three kinds of leftover are now recognised and shown on their own dashboard lanes. They are **report-only** today; the 14-day trash hold is what will let Cleaner act on them.
+
+- **Verified duplicates.** Proven by content, not by name, so a `- Copy` folder is recognised even though Archive Assistant never recorded it. The folder must be at least `MIN_AGE_DAYS` old.
+- **Quarantine discards.** Only items whose newest Archive Assistant decision is `discard_approved` and whose files still match the recorded inventory. Undecided, restored or revoked items are never picked up. A decision made less than `MIN_AGE_DAYS` ago is shown with the date it becomes eligible.
+- **Unrecorded leftovers.** Listed so nothing sits unnoticed, but never picked up automatically: it could be a download you have not scanned yet.
+
+Checking a folder against the libraries means hashing files. The dashboard spends at most 5 seconds per refresh on it and shows the rest as "not yet checked" (hashes are remembered, so it finishes over a few refreshes). A written plan (**Run dry plan**, the CLI, the weekly run) checks everything.
 
 ## Modes and gates
 
@@ -106,8 +119,8 @@ On the dashboard, **Run dry plan** (or **Write plan to review** when execution i
 
 - When one download produced several move records (for example a discography split into albums), Cleaner keeps only one record per source folder when checking destinations.
 - Cleaner does not yet ask Archive Assistant whether any batch from a folder is still pending review. A folder that still holds unmoved media is reported as `uncertain_leftover`, never removed, because it is not empty.
-- Cleaner does not yet read Archive Assistant **disposition records** (quarantine, discard, reject). Discarded quarantine items stay on disk.
-- The 14-day trash hold is not built.
+- Cleaner reads `discard_approved` disposition records but ignores `rejected` ones, so a rejected batch's files are reported, not cleaned.
+- The 14-day trash hold is not built. Until it is, duplicates, discards and unrecorded leftovers are reported but nothing acts on them.
 
 ## Roadmap
 

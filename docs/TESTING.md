@@ -5,7 +5,7 @@ Set-Location C:\Dev\NAS\cleaner
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-63 tests. They use temporary folders only and never touch the real data root.
+79 tests. They use temporary folders only and never touch the real data root.
 
 What they prove:
 
@@ -37,4 +37,10 @@ a refused request that carries a large body still gets a clean 403, never a drop
 manifests are found at every layout Archive Assistant writes, and only inside the evidence folders
 the evidence scan lists each folder once and never opens individual files
 the dashboard may reuse evidence for 60 seconds; written plans and executions never do
+a folder with no Archive Assistant record is a verified duplicate only when every media file is a byte copy of a library file (names do not matter)
+same size but different bytes, a new media file, an unknown file type, or only artwork keeps it an unrecorded leftover
+hashing respects a time budget and finishes on a later run
+an approved quarantine discard is picked up; undecided, revoked, restored, changed or out-of-quarantine decisions are not
+nothing picked up is touched, even with every production gate open
+the dashboard shows the new lanes and counts
 ```

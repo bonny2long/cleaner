@@ -54,6 +54,7 @@ class Classification:
     reason: str
     evidence: EvidenceRecord | None = None
     severity: str = "info"
+    details: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -71,6 +72,7 @@ class PlannedAction:
     reason: str
     severity: str = "info"
     evidence: EvidenceRecord | None = None
+    details: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)

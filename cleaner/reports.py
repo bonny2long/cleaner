@@ -89,6 +89,22 @@ def plan_markdown(plan: CleanerPlan) -> str:
                 f"- Destination verified: `{action.evidence.destination_verified}`",
                 f"- Status after move: `{action.evidence.status_after_move}`",
             ])
+        details = action.details or {}
+        if "content_files" in details:
+            lines.append(f"- Media files matching the library: {details.get('matched_files', 0)} of {details.get('content_files', 0)}")
+            for match in details.get("library_matches", [])[:5]:
+                lines.append(f"  - `{match['file']}` = `{match['library_path']}`")
+            for name in details.get("unmatched_examples", [])[:5]:
+                lines.append(f"  - not in any library: `{name}`")
+            for name in details.get("other_file_examples", [])[:5]:
+                lines.append(f"  - not recognised: `{name}`")
+        if "decided_at" in details:
+            lines.extend([
+                f"- Discard approved: {details.get('decided_at')} (Archive Assistant batch {details.get('batch_id')})",
+                f"- Reason given: {details.get('discard_reason')}",
+                f"- Eligible after: {details.get('eligible_after')}",
+                f"- Inventory check: {details.get('inventory_check')}",
+            ])
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 

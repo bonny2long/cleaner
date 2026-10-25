@@ -74,40 +74,67 @@ def _dir_stats(path: Path, config: CleanerConfig) -> tuple[int, int, int, float,
     return file_count, dir_count, total_size, max_mtime, trash_only, hidden_or_sidecar, rip_sidecars
 
 
+def _scan_item(config: CleanerConfig, area: str, path: Path, now: float) -> ScanItem | None:
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    kind = "file" if path.is_file() else "directory"
+    file_count, dir_count, total_size, max_mtime, trash_only, hidden_or_sidecar, rip_sidecars = _dir_stats(path, config)
+    # A folder whose whole tree holds no files (only empty disc/sub folders,
+    # e.g. "CD 1" left behind after a move) is empty for cleanup purposes.
+    empty = path.is_dir() and file_count == 0
+    age_days = max(0.0, (now - max_mtime) / 86400)
+    return ScanItem(
+        path=str(path),
+        relative_path=_relative(path, config.data_root),
+        name=path.name,
+        kind=kind,
+        area=area,
+        empty=empty,
+        file_count=file_count,
+        dir_count=dir_count,
+        total_size_bytes=total_size,
+        modified_time=stat.st_mtime,
+        max_modified_time=max_mtime,
+        age_days=age_days,
+        known_trash_only=trash_only,
+        hidden_or_sidecar_count=hidden_or_sidecar,
+        rip_sidecar_count=rip_sidecars,
+    )
+
+
 def _scan_area(config: CleanerConfig, area: str, root: Path, now: float) -> list[ScanItem]:
     if not root.exists():
         return []
     items: list[ScanItem] = []
     for path in sorted(root.iterdir(), key=lambda p: p.name.casefold()):
+        item = _scan_item(config, area, path, now)
+        if item is not None:
+            items.append(item)
+    return items
+
+
+def scan_quarantine_discards(config: CleanerConfig, relative_paths: list[str], now: float | None = None) -> list[ScanItem]:
+    """Scan individual quarantined items a person approved for discard.
+
+    Quarantine is scanned as three container folders, so single items are looked up by the
+    path Archive Assistant recorded. Anything that is not inside ``_QUARANTINE`` is ignored.
+    """
+    now = now or time.time()
+    quarantine = config.quarantine_dir.resolve()
+    items: list[ScanItem] = []
+    for relative in sorted(relative_paths):
+        path = config.data_root / relative
         try:
-            stat = path.stat()
-        except OSError:
+            path.resolve().relative_to(quarantine)
+        except (OSError, ValueError):
             continue
-        kind = "file" if path.is_file() else "directory"
-        file_count, dir_count, total_size, max_mtime, trash_only, hidden_or_sidecar, rip_sidecars = _dir_stats(path, config)
-        # A folder whose whole tree holds no files (only empty disc/sub folders,
-        # e.g. "CD 1" left behind after a move) is empty for cleanup purposes.
-        empty = path.is_dir() and file_count == 0
-        age_days = max(0.0, (now - max_mtime) / 86400)
-        items.append(
-            ScanItem(
-                path=str(path),
-                relative_path=_relative(path, config.data_root),
-                name=path.name,
-                kind=kind,
-                area=area,
-                empty=empty,
-                file_count=file_count,
-                dir_count=dir_count,
-                total_size_bytes=total_size,
-                modified_time=stat.st_mtime,
-                max_modified_time=max_mtime,
-                age_days=age_days,
-                known_trash_only=trash_only,
-                hidden_or_sidecar_count=hidden_or_sidecar,
-                rip_sidecar_count=rip_sidecars,
-            )
-        )
+        if not path.exists() or path.resolve() == quarantine:
+            continue
+        item = _scan_item(config, "quarantine-discard", path, now)
+        if item is not None:
+            items.append(item)
     return items
 
 
