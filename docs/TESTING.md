@@ -5,7 +5,7 @@ Set-Location C:\Dev\NAS\cleaner
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-54 tests. They use temporary folders only and never touch the real data root.
+55 tests. They use temporary folders only and never touch the real data root.
 
 What they prove:
 
@@ -33,4 +33,5 @@ rip logs next to unmoved audio, without move evidence, or under 30 days old are 
 execution never touches a rip-log folder, even with every production gate on
 a POST from another site is refused (403) before it can write a plan or start an execution
 the dashboard's own address, listed LAN origins and plain clients such as curl still work
+a refused request that carries a large body still gets a clean 403, never a dropped connection
 ```

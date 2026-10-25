@@ -95,6 +95,21 @@ def test_foreign_page_cannot_write_a_plan_or_start_an_execution(config, data_roo
     assert not config.cleaner_reports_dir.exists() or not any(config.cleaner_reports_dir.iterdir())
 
 
+def test_refusing_a_request_that_has_a_body_is_always_a_clean_403(config, data_root: Path) -> None:
+    # The server must read the body it is refusing; otherwise closing the socket with unread
+    # data can reset the connection and the caller sees a network error instead of the 403.
+    body = json.dumps({"run_id": "x" * 300_000}).encode()
+    with running_server(config) as port:
+        for _ in range(40):
+            status, payload = post(
+                port,
+                "/api/execute",
+                {"Origin": "https://evil.example", "Content-Type": "application/json"},
+                body,
+            )
+            assert status == 403 and payload["ok"] is False
+
+
 def test_dashboard_origin_and_plain_clients_still_work(config, data_root: Path) -> None:
     with running_server(config) as port:
         status, payload = post(port, "/api/run-dry-plan", {"Origin": f"http://127.0.0.1:{port}"})
