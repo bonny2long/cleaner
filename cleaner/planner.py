@@ -24,11 +24,6 @@ def _action_for_category(config: CleanerConfig, category: str) -> tuple[str, str
             return "delete_known_trash", "allowed_by_production_gates"
         return "blocked_no_action", "blocked_by_config"
     if category == "uncertain_leftover":
-        if config.allow_leftover_review_moves and not config.dry_run and not config.destructive_actions_enabled:
-            # Moving leftovers is non-destructive, but still disabled in MVP unless explicitly enabled later.
-            return "move_to_leftover_review", "allowed_non_destructive_move"
-        if config.allow_leftover_review_moves and config.dry_run:
-            return "move_to_leftover_review_dry_run", "allowed_in_dry_run_only"
         return "report_only", "leave_visible_for_review"
     if category in {"quarantine_hold", "do_not_touch"}:
         return "report_only", "protected_path"

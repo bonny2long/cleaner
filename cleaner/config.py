@@ -92,7 +92,6 @@ class CleanerConfig:
     dashboard_host: str = "127.0.0.1"
     dashboard_port: int = 8092
     allow_empty_folder_removal: bool = False
-    allow_leftover_review_moves: bool = False
     allow_quarantine_routing: bool = False
     allow_known_trash_delete: bool = False
     ignore_incoming: bool = True
@@ -118,7 +117,6 @@ class CleanerConfig:
             dashboard_host=os.getenv("DASHBOARD_HOST", "127.0.0.1"),
             dashboard_port=_env_int("DASHBOARD_PORT", 8092),
             allow_empty_folder_removal=_env_bool("ALLOW_EMPTY_FOLDER_REMOVAL", False),
-            allow_leftover_review_moves=_env_bool("ALLOW_LEFTOVER_REVIEW_MOVES", False),
             allow_quarantine_routing=_env_bool("ALLOW_QUARANTINE_ROUTING", False),
             allow_known_trash_delete=_env_bool("ALLOW_KNOWN_TRASH_DELETE", False),
             ignore_incoming=_env_bool("IGNORE_INCOMING", True),

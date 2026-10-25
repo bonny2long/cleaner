@@ -73,7 +73,7 @@ Even then, a removal must pass every check at the moment it runs:
 
 Removal deletes folders bottom-up with `rmdir` only. If a file appears mid-way, the removal stops. Each run writes `execution-<run id>.json` listing every removed folder so it can be recreated.
 
-`ALLOW_KNOWN_TRASH_DELETE`, `ALLOW_LEFTOVER_REVIEW_MOVES` and `ALLOW_QUARANTINE_ROUTING` exist in configuration but no working action is wired to them yet. Leave them `false`.
+`ALLOW_KNOWN_TRASH_DELETE` and `ALLOW_QUARANTINE_ROUTING` exist in configuration but no working action is wired to them yet. Leave them `false`.
 
 ## Evidence Cleaner reads
 
