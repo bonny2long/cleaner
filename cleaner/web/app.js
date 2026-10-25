@@ -21,7 +21,39 @@ function titleCase(value) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function formatBytes(value) {
+  const bytes = Number(value || 0);
+  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
+  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(1)} MB`;
+  if (bytes >= 1e3) return `${(bytes / 1e3).toFixed(0)} KB`;
+  return `${bytes} B`;
+}
+
+function detailLine(action) {
+  const d = action.details;
+  if (!d) return "";
+  if (action.category === "verified_duplicate") {
+    const example = (d.library_matches || [])[0];
+    return `${d.matched_files} of ${d.content_files} media files match the library (${formatBytes(d.total_bytes)})`
+      + (example ? `. Example: ${example.file} = ${example.library_path}` : "");
+  }
+  if (action.category === "unrecorded_leftover") {
+    if (d.duplicate_check === "pending") return "Not yet checked against the library.";
+    const parts = [`${d.matched_files || 0} of ${d.content_files || 0} media files match the library`];
+    if ((d.unmatched_examples || []).length) parts.push(`not in a library: ${d.unmatched_examples.join(", ")}`);
+    if ((d.other_file_examples || []).length) parts.push(`unrecognised: ${d.other_file_examples.join(", ")}`);
+    return parts.join(". ");
+  }
+  if (action.category === "quarantine_discard_approved") {
+    const when = d.eligible_now ? "eligible now" : `eligible after ${String(d.eligible_after || "").slice(0, 10)}`;
+    return `Decided ${String(d.decided_at || "").slice(0, 10)} (batch ${d.batch_id}); ${d.file_count} file(s), ${formatBytes(d.size_bytes)}; ${when}`;
+  }
+  return "";
+}
+
 function actionClass(category) {
+  if (category === "verified_duplicate" || category === "quarantine_discard_approved") return "ready";
+  if (category === "unrecorded_leftover") return "warning";
   if (category === "safe_empty_folder") return "ready";
   if (category === "blocked_too_new") return "waiting";
   if (category === "quarantine_hold" || category === "do_not_touch") return "protected";
@@ -53,6 +85,7 @@ function card(action) {
       </div>
       <span class="status ${actionClass(action.category)}">${escapeHtml(titleCase(action.category))}</span>
       <p class="detail">${escapeHtml(action.reason || "")}</p>
+      ${detailLine(action) ? `<p class="detail">${escapeHtml(detailLine(action))}</p>` : ""}
     </article>
   `;
 }
@@ -90,6 +123,9 @@ async function loadDashboard() {
     const safe = lanes.ready_to_clean_later || [];
     const tooNew = lanes.too_new || [];
     const review = lanes.leftovers_need_review || [];
+    const duplicates = lanes.duplicates || [];
+    const discards = lanes.quarantine_discards || [];
+    const unrecorded = lanes.unrecorded || [];
     const quarantine = lanes.quarantine_hold || [];
     const blocked = lanes.blocked_by_safety || [];
     const protectedItems = lanes.protected || [];
@@ -110,11 +146,17 @@ async function loadDashboard() {
     setCount("countTooNew", tooNew.length, "#f59e0b");
     setCount("countReview", review.length, null);
     setCount("countQuarantine", quarantine.length, null);
+    setCount("countDuplicates", duplicates.length, "#10B981");
+    setCount("countDiscards", discards.length, "#10B981");
+    setCount("countUnrecorded", unrecorded.length, "#f59e0b");
     setCount("countBlocked", blocked.length, "#ef4444");
 
     el("safeBadge").textContent = safe.length;
     el("newBadge").textContent = tooNew.length;
     el("reviewBadge").textContent = review.length;
+    el("duplicateBadge").textContent = duplicates.length;
+    el("discardBadge").textContent = discards.length;
+    el("unrecordedBadge").textContent = unrecorded.length;
     el("blockedBadge").textContent = blocked.length;
     el("eventBadge").textContent = quarantine.length + protectedItems.length + events.length;
 
@@ -122,6 +164,9 @@ async function loadDashboard() {
     renderList("safeList", safe, "No safe empty folders found.");
     renderList("newList", tooNew, "No too-new items.");
     renderList("reviewList", review, "No leftovers needing review.");
+    renderList("duplicateList", duplicates, "No verified duplicates.");
+    renderList("discardList", discards, "No approved discards.");
+    renderList("unrecordedList", unrecorded, "No unrecorded leftovers.");
     renderList("blockedList", blocked, "No blocked items.");
     renderList(
       "eventList",

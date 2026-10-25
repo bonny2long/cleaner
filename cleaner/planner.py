@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from collections import Counter
 
-from .classifier import classify_items
+from .classifier import ClassificationContext, classify_items
 from .config import CleanerConfig
 from .evidence import evidence_index
 from .models import CleanerPlan, PlannedAction
 from .reports import run_id, utc_now_iso
-from .scanner import scan_cleanup_candidates
+from .scanner import scan_cleanup_candidates, scan_quarantine_discards
 
 
 def _action_for_category(config: CleanerConfig, category: str) -> tuple[str, str]:
@@ -25,6 +25,11 @@ def _action_for_category(config: CleanerConfig, category: str) -> tuple[str, str
         return "blocked_no_action", "blocked_by_config"
     if category == "uncertain_leftover":
         return "report_only", "leave_visible_for_review"
+    # Picked up for cleanup, but nothing can act on them until the 14-day trash hold exists.
+    if category in {"verified_duplicate", "quarantine_discard_approved"}:
+        return "report_only", "awaiting_trash_hold"
+    if category == "unrecorded_leftover":
+        return "report_only", "needs_your_decision"
     if category in {"quarantine_hold", "do_not_touch"}:
         return "report_only", "protected_path"
     if category.startswith("blocked_"):
@@ -32,13 +37,24 @@ def _action_for_category(config: CleanerConfig, category: str) -> tuple[str, str
     return "report_only", "no_action_default"
 
 
-def build_plan(config: CleanerConfig, write_report: bool = False, evidence_max_age_seconds: float = 0) -> CleanerPlan:
-    """Build a plan. Evidence is read fresh unless the caller (the dashboard) allows a short-lived cache."""
+def build_plan(
+    config: CleanerConfig,
+    write_report: bool = False,
+    evidence_max_age_seconds: float = 0,
+    hash_budget_seconds: float | None = None,
+) -> CleanerPlan:
+    """Build a plan.
+
+    Evidence is read fresh unless the caller (the dashboard) allows a short-lived cache. Content
+    hashing is unlimited unless the caller (the dashboard) passes a small time budget.
+    """
     config.validate()
     config.ensure_shared_directories()
     evidence = evidence_index(config, max_age_seconds=evidence_max_age_seconds)
+    context = ClassificationContext(config, hash_budget_seconds=hash_budget_seconds)
     items = scan_cleanup_candidates(config)
-    classified = classify_items(config, items, evidence)
+    items.extend(scan_quarantine_discards(config, list(context.discards)))
+    classified = classify_items(config, items, evidence, context)
 
     actions: list[PlannedAction] = []
     counts: Counter[str] = Counter()
@@ -55,6 +71,7 @@ def build_plan(config: CleanerConfig, write_report: bool = False, evidence_max_a
                 reason=classification.reason,
                 severity=classification.severity,
                 evidence=classification.evidence,
+                details=classification.details,
             )
         )
 

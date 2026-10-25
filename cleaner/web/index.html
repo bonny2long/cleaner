@@ -60,6 +60,15 @@
           <span id="countQuarantine">0</span><small>Quarantine</small>
         </article>
         <article>
+          <span id="countDuplicates">0</span><small>Duplicates</small>
+        </article>
+        <article>
+          <span id="countDiscards">0</span><small>Discards</small>
+        </article>
+        <article>
+          <span id="countUnrecorded">0</span><small>Unrecorded</small>
+        </article>
+        <article>
           <span id="countBlocked">0</span><small>Blocked</small>
         </article>
       </section>
@@ -109,6 +118,53 @@
           </p>
           <div id="reviewList" class="cards empty">
             No leftovers needing review.
+          </div>
+        </section>
+      </section>
+
+      <section class="grid main-grid">
+        <section class="lane success">
+          <div class="lane-title">
+            <h2>Verified Duplicates</h2>
+            <span id="duplicateBadge">0</span>
+          </div>
+          <p class="lane-help">
+            Every media file in these folders is an exact copy of a file already
+            in your library, even though Archive Assistant has no record of the
+            folder. Nothing is removed yet; they wait for the 14-day trash hold.
+          </p>
+          <div id="duplicateList" class="cards empty">
+            No verified duplicates.
+          </div>
+        </section>
+
+        <section class="lane success">
+          <div class="lane-title">
+            <h2>Quarantine Discards</h2>
+            <span id="discardBadge">0</span>
+          </div>
+          <p class="lane-help">
+            Quarantined items you approved for discard in Archive Assistant.
+            Undecided quarantine items are never listed here. Nothing is removed
+            yet; they wait for the 14-day trash hold.
+          </p>
+          <div id="discardList" class="cards empty">
+            No approved discards.
+          </div>
+        </section>
+
+        <section class="lane warning">
+          <div class="lane-title">
+            <h2>Unrecorded Leftovers</h2>
+            <span id="unrecordedBadge">0</span>
+          </div>
+          <p class="lane-help">
+            Archive Assistant has no record of these and they are not provable
+            duplicates, so they stay put unless you choose them once the trash
+            hold exists. Check whether one is a download you never scanned.
+          </p>
+          <div id="unrecordedList" class="cards empty">
+            No unrecorded leftovers.
           </div>
         </section>
       </section>

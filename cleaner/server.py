@@ -32,33 +32,44 @@ def _json_default(value: Any) -> Any:
 # from rescanning every library on each refresh. Plans that are written or executed
 # always read fresh evidence (see run_dry_plan and run_execution).
 DASHBOARD_EVIDENCE_CACHE_SECONDS = 60
+# Checking an unrecorded folder against the libraries means hashing files. The dashboard
+# spends at most this long per refresh and shows the rest as "not yet checked"; hashes are
+# remembered, so folders finish over a few refreshes. Written plans have no limit.
+DASHBOARD_HASH_BUDGET_SECONDS = 5
+
+LANE_FOR_CATEGORY = {
+    "safe_empty_folder": "ready_to_clean_later",
+    "blocked_too_new": "too_new",
+    "uncertain_leftover": "leftovers_need_review",
+    "known_harmless_trash": "leftovers_need_review",
+    "verified_duplicate": "duplicates",
+    "unrecorded_leftover": "unrecorded",
+    "quarantine_discard_approved": "quarantine_discards",
+    "quarantine_hold": "quarantine_hold",
+    "do_not_touch": "protected",
+}
 
 
 def build_dashboard_payload(config: CleanerConfig) -> dict[str, Any]:
-    plan = build_plan(config, evidence_max_age_seconds=DASHBOARD_EVIDENCE_CACHE_SECONDS)
+    plan = build_plan(
+        config,
+        evidence_max_age_seconds=DASHBOARD_EVIDENCE_CACHE_SECONDS,
+        hash_budget_seconds=DASHBOARD_HASH_BUDGET_SECONDS,
+    )
     events = read_recent_jsonl(config.cleaner_log_path, 80)
     lanes: dict[str, list[dict[str, Any]]] = {
         "ready_to_clean_later": [],
         "too_new": [],
         "leftovers_need_review": [],
+        "duplicates": [],
+        "unrecorded": [],
+        "quarantine_discards": [],
         "quarantine_hold": [],
         "blocked_by_safety": [],
         "protected": [],
     }
     for action in plan.actions:
-        data = action.to_dict()
-        if action.category == "safe_empty_folder":
-            lanes["ready_to_clean_later"].append(data)
-        elif action.category == "blocked_too_new":
-            lanes["too_new"].append(data)
-        elif action.category in {"uncertain_leftover", "known_harmless_trash"}:
-            lanes["leftovers_need_review"].append(data)
-        elif action.category == "quarantine_hold":
-            lanes["quarantine_hold"].append(data)
-        elif action.category == "do_not_touch":
-            lanes["protected"].append(data)
-        else:
-            lanes["blocked_by_safety"].append(data)
+        lanes[LANE_FOR_CATEGORY.get(action.category, "blocked_by_safety")].append(action.to_dict())
 
     return {
         "service": "nas-cleaner",
@@ -174,7 +185,11 @@ class CleanerHandler(BaseHTTPRequestHandler):
             self._send_json(build_dashboard_payload(self.config))
             return
         if path == "/api/plan":
-            self._send_json(build_plan(self.config, evidence_max_age_seconds=DASHBOARD_EVIDENCE_CACHE_SECONDS).to_dict())
+            self._send_json(build_plan(
+                self.config,
+                evidence_max_age_seconds=DASHBOARD_EVIDENCE_CACHE_SECONDS,
+                hash_budget_seconds=DASHBOARD_HASH_BUDGET_SECONDS,
+            ).to_dict())
             return
         if path == "/":
             self._send_file(WEB_DIR / "index.html")

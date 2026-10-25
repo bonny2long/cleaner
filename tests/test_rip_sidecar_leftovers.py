@@ -76,10 +76,14 @@ def test_lookalike_names_are_not_rip_sidecars(config, data_root: Path, name: str
     assert _action(config, "_INGEST/ready/Lookalike").category == "uncertain_leftover"
 
 
-def test_rip_logs_without_move_evidence_stay_blocked(config, data_root: Path) -> None:
+def test_rip_logs_without_move_evidence_are_not_labeled_trash(config, data_root: Path) -> None:
     _release(data_root, "No Evidence", RIP_FILES, evidence=False)
 
-    assert _action(config, "_INGEST/ready/No Evidence").category == "blocked_by_missing_evidence"
+    action = _action(config, "_INGEST/ready/No Evidence")
+
+    # Without an Archive Assistant record they are only "unrecorded": shown for a decision, never labeled harmless.
+    assert action.category == "unrecorded_leftover"
+    assert action.action == "report_only"
 
 
 def test_young_rip_logs_wait_for_the_age_gate(config, data_root: Path) -> None:

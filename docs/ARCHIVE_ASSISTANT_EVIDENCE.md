@@ -25,11 +25,20 @@ destination_roots
 batch_id, detected_type, review_type, created_at
 ```
 
-A leftover is eligible for cleanup planning only when a matching manifest exists, its status is final, and every destination it lists still exists. Otherwise it is `blocked_by_missing_evidence` or `blocked_by_destination_missing`.
+A leftover is eligible for cleanup planning only when a matching manifest exists, its status is final, and every destination it lists still exists. Otherwise it is `blocked_by_destination_missing`, or, when no manifest matches at all, one of the "no record" outcomes below.
+
+### Folders with no manifest
+
+A non-empty folder in `ready`, `failed` or `staging` that no manifest matches is not simply blocked. Cleaner compares its media files with the final libraries by SHA-256 (`Music`, `Movies`, `TV`, `Books`, `Audiobooks`):
+
+- every media file is an exact copy of a library file, and everything else is artwork, release notes (`.nfo`, `.sfv`, `.md5`, `.ffp`, subtitles), rip logs, known junk or empty: `verified_duplicate`;
+- anything else: `unrecorded_leftover`. It is never picked up on its own, because it may be a download that has not been scanned yet.
+
+An empty folder with no manifest stays `blocked_by_missing_evidence`.
 
 Known gap: when several manifests share one source folder (a discography split into albums), Cleaner currently keeps only one of them per source.
 
-## Disposition records (not read yet)
+## Disposition records (read for quarantine discards)
 
 Archive Assistant also writes append-only disposition records for quarantine, restore, discard, undo discard, and reject:
 
@@ -37,4 +46,11 @@ Archive Assistant also writes append-only disposition records for quarantine, re
 _REPORTS/archive-assistant/dispositions/<timestamp>_<batch>_<action>.json
 ```
 
-The format is documented in Archive Assistant's `docs/CLEANER_BOUNDARY.md`. Cleaner will use `discard_approved` records to clean approved quarantine discards after the planned trash hold is built. Rules for that phase: act only when `discard_approved` is the newest record for the batch, and the live files still match the record's `inventory`. Treat a `rejected` record whose `shared_source_batch_ids` is not empty as a shared folder, not a rejected one.
+The format is documented in Archive Assistant's `docs/CLEANER_BOUNDARY.md`. Cleaner reads them and picks up a quarantined item only when all of this holds:
+
+- `discard_approved` is the newest record for its batch (a later `discard_revoked` or `restored` cancels it);
+- its recorded path is inside `_QUARANTINE` (a record pointing anywhere else is ignored);
+- the live files still match the record's `inventory` exactly (same names and sizes, nothing added or missing);
+- `MIN_AGE_DAYS` have passed since the decision; before that the item is listed with the date it becomes eligible.
+
+Items that fail the inventory check are reported as `quarantine_hold` with the reason. Items nobody decided about are never picked up. `rejected` records are not used yet: a rejected batch's files are reported, not cleaned, because a `rejected` record whose `shared_source_batch_ids` is not empty means a shared folder, not a rejected one.

@@ -11,7 +11,9 @@ write inside final libraries (Music, Movies, TV, Books, Audiobooks)
 touch Photos, Documents, Projects, Backups
 touch _INGEST/incoming or _INGEST/intake-processing
 touch _QUARANTINE or _INGEST/leftover-review
-act without Archive Assistant move evidence
+act without proof: an Archive Assistant move record, or a byte-for-byte copy already in a final library, or a person's recorded discard decision
+treat an unrecorded folder as removable unless every media file in it is proven to be a copy of library content
+act on a quarantined item nobody approved for discard, or whose files changed since the decision
 act on anything younger than MIN_AGE_DAYS (30)
 act on anything not in a plan a person reviewed
 act on a POST from a web page on another site (Origin must be loopback or listed in ALLOWED_ORIGINS)
@@ -51,4 +53,4 @@ Removal uses `rmdir` bottom-up, so a file appearing mid-removal stops it. Every 
 
 ## Before any further action is enabled
 
-Known junk deletion, leftover moves, and quarantine discards stay disabled until: Cleaner reads every move record and Archive Assistant disposition records, checks for pending Archive Assistant batches, and routes deletions through a 14-day trash hold.
+Cleaner now recognises verified duplicates, approved quarantine discards and unrecorded leftovers (it reads Archive Assistant's disposition records and compares content with the libraries), but only reports them. Acting on them, and on known junk, stays disabled until Cleaner checks for pending Archive Assistant batches, reads every move record per source folder, and routes removals through a 14-day trash hold that keeps them recoverable.

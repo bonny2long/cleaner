@@ -8,7 +8,11 @@
 - Move manifests are now found by one folder-only pass over `Music`, `Movies`, `TV`, `Books`, `Audiobooks` and `_REPORTS/move_manifests` (8 levels deep) instead of two whole-data-root globs. Measured on 3,000 synthetic albums: about 4x faster, same 3,000 manifests found; on the real data root the same 7.
 - Manifests outside those folders (for example a copy in `Backups`) no longer count as evidence.
 - The dashboard and `GET /api/plan` reuse the evidence for up to 60 seconds, so its 30-second refresh does not rescan the libraries each time. Writing a plan (`/api/run-dry-plan`) and executing always read fresh evidence.
-- Tests: 63.
+- **Picks up three more kinds of leftover (report-only).** `verified_duplicate`: a folder Archive Assistant has no record of whose media files are all byte-for-byte copies (SHA-256) of files already in a final library, so a `- Copy` folder is recognised by content. `quarantine_discard_approved`: a quarantined item whose newest Archive Assistant disposition record is `discard_approved`, whose recorded path is inside `_QUARANTINE`, and whose files still match the recorded inventory; shown with the date it becomes eligible. `unrecorded_leftover`: any other folder with no record, listed for a decision and never picked up automatically. Undecided quarantine items stay `quarantine_hold`. New dashboard lanes and counters, and the written report lists the matches.
+- Folders with files but no Archive Assistant record used to be `blocked_by_missing_evidence`; they are now `unrecorded_leftover` or `verified_duplicate`. Empty folders with no record are unchanged.
+- The dashboard checks duplicates for at most 5 seconds per refresh and shows the rest as "not yet checked"; written plans check everything. Measured on the real `ready` folder: the 182-file Mac Miller copy verifies 182 of 182 in about 54 s.
+- Nothing is removed for these categories. They wait for the 14-day trash hold.
+- Tests: 79.
 
 ## 0.2.0 - 2026-09-27
 
