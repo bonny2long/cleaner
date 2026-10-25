@@ -4,6 +4,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from .origin_guard import parse_origin_list
+
 DEFAULT_KNOWN_TRASH_NAMES = (
     ".DS_Store",
     "Thumbs.db",
@@ -102,6 +104,7 @@ class CleanerConfig:
     cleaner_reports_dir_override: Path | None = None
     leftover_review_dir_override: Path | None = None
     quarantine_dir_override: Path | None = None
+    allowed_origins: tuple[str, ...] = ()
 
     @classmethod
     def from_env(cls) -> "CleanerConfig":
@@ -126,6 +129,7 @@ class CleanerConfig:
             cleaner_reports_dir_override=_env_path("CLEANER_REPORTS_DIR", Path("")) if os.getenv("CLEANER_REPORTS_DIR") else None,
             leftover_review_dir_override=_env_path("LEFTOVER_REVIEW_DIR", Path("")) if os.getenv("LEFTOVER_REVIEW_DIR") else None,
             quarantine_dir_override=_env_path("QUARANTINE_DIR", Path("")) if os.getenv("QUARANTINE_DIR") else None,
+            allowed_origins=parse_origin_list(os.getenv("ALLOWED_ORIGINS")),
         )
 
     @property

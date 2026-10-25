@@ -5,7 +5,7 @@ Set-Location C:\Dev\NAS\cleaner
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-18 tests. They use temporary folders only and never touch the real data root.
+39 tests. They use temporary folders only and never touch the real data root.
 
 What they prove:
 
@@ -27,4 +27,6 @@ a stale (over 24 hours) or malformed reviewed plan is refused
 execution is refused while report-only
 empty disc sub-folders (CD 1, CD 2) count as empty and are all removed
 a tree with a file anywhere inside is never removed
+a POST from another site is refused (403) before it can write a plan or start an execution
+the dashboard's own address, listed LAN origins and plain clients such as curl still work
 ```

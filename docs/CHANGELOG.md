@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased - Origin check
+
+- `POST` requests (`/api/run-dry-plan`, `/api/execute`, `/api/ensure-folders`) are rejected with 403 when their `Origin` header is not a loopback address or listed in the new `ALLOWED_ORIGINS` setting. This stops a web page on another site from driving Cleaner through the browser. Requests with no `Origin` header (curl, scripts) still work, and the existing gates and reviewed-plan requirement for removal are unchanged.
+
 ## 0.2.0 - 2026-09-27
 
 - Default `MIN_AGE_DAYS` is now 30 (was 14), matching the agreed timing model: weekly check, 30-day age gate, planned 14-day trash hold.

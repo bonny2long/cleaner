@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 from .config import CleanerConfig
 from .executor import CleanerExecutionError, execute_plan, execution_enabled, load_reviewed_plan, write_execution_report
+from .origin_guard import request_allowed
 from .planner import build_plan
 from .reports import read_json, read_recent_jsonl, write_plan_report
 
@@ -178,6 +179,15 @@ class CleanerHandler(BaseHTTPRequestHandler):
         self.send_error(HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:  # noqa: N802
+        allowed, reason = request_allowed(
+            "POST",
+            self.headers.get("Origin"),
+            self.headers.get("Sec-Fetch-Site"),
+            self.config.allowed_origins,
+        )
+        if not allowed:
+            self._send_json({"ok": False, "error": reason}, HTTPStatus.FORBIDDEN)
+            return
         parsed = urlparse(self.path)
         if parsed.path == "/api/run-dry-plan":
             self._send_json(run_dry_plan(self.config))
