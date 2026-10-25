@@ -42,6 +42,7 @@ class ScanItem:
     age_days: float
     known_trash_only: bool = False
     hidden_or_sidecar_count: int = 0
+    rip_sidecar_count: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

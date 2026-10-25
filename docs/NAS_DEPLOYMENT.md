@@ -9,6 +9,8 @@ TrueNAS deployment is planned, not done. Target mapping:
 
 Keep Cleaner private. Use LAN, Tailscale, or VPN. Never forward its port publicly.
 
+Buttons that change anything (Run dry plan, Remove empty folders) only work from the dashboard's own address. The server rejects a POST whose `Origin` header is not a loopback address, so a web page on another site cannot trigger them. To use the dashboard from a LAN or Tailscale address, set `ALLOWED_ORIGINS` to that exact address, for example `ALLOWED_ORIGINS=http://192.168.1.50:8092`. Plain scripts such as `curl` send no `Origin` header and are not affected.
+
 Start the NAS deployment report-only:
 
 ```env
