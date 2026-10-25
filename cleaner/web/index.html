@@ -33,8 +33,8 @@
           <p class="eyebrow">NAS Cleaner</p>
           <h1>Cleanup Planning</h1>
           <p class="subtle">
-            Dry-run view for safe empty folders, leftovers, quarantine holds,
-            and blocked cleanup.
+            Safe empty folders, duplicates, leftovers and the recoverable trash
+            hold. Nothing is deleted without a reviewed plan.
           </p>
         </div>
         <div class="actions">
@@ -45,6 +45,9 @@
           <button id="executeBtn" type="button" class="danger" hidden>
             Remove empty folders
           </button>
+          <button id="trashBtn" type="button" class="danger" hidden>
+            Move to trash hold
+          </button>
         </div>
       </header>
 
@@ -54,11 +57,6 @@
         <article>
           <span id="countSafe">0</span><small>Safe empty</small>
         </article>
-        <article><span id="countTooNew">0</span><small>Too new</small></article>
-        <article><span id="countReview">0</span><small>Review</small></article>
-        <article>
-          <span id="countQuarantine">0</span><small>Quarantine</small>
-        </article>
         <article>
           <span id="countDuplicates">0</span><small>Duplicates</small>
         </article>
@@ -67,6 +65,11 @@
         </article>
         <article>
           <span id="countUnrecorded">0</span><small>Unrecorded</small>
+        </article>
+        <article><span id="countReview">0</span><small>Review</small></article>
+        <article><span id="countTooNew">0</span><small>Too new</small></article>
+        <article>
+          <span id="countQuarantine">0</span><small>Quarantine</small>
         </article>
         <article>
           <span id="countBlocked">0</span><small>Blocked</small>
@@ -81,18 +84,79 @@
         <dl id="paths"></dl>
       </details>
 
-      <section class="grid main-grid">
+      <h2 class="section-title">Ready to clean</h2>
+      <section class="grid">
         <section class="lane success">
           <div class="lane-title">
             <h2>Safe Empty Folders</h2>
             <span id="safeBadge">0</span>
           </div>
           <p class="lane-help">
-            These are dry-run candidates only. Empty-folder removal stays
-            blocked until production gates are deliberately enabled.
+            Folders with no files left, backed by an Archive Assistant move
+            record. Removal needs the production gates.
           </p>
           <div id="safeList" class="cards empty">
             No safe empty folders found.
+          </div>
+        </section>
+
+        <section class="lane success">
+          <div class="lane-title">
+            <h2>Verified Duplicates</h2>
+            <span id="duplicateBadge">0</span>
+          </div>
+          <p class="lane-help">
+            Every media file is an exact copy of one already in your library.
+            They move into the recoverable trash hold, never straight to
+            deletion.
+          </p>
+          <div id="duplicateList" class="cards empty">
+            No verified duplicates.
+          </div>
+        </section>
+
+        <section class="lane success">
+          <div class="lane-title">
+            <h2>Quarantine Discards</h2>
+            <span id="discardBadge">0</span>
+          </div>
+          <p class="lane-help">
+            Quarantined items you approved for discard in Archive Assistant.
+            Undecided items are never listed here.
+          </p>
+          <div id="discardList" class="cards empty">
+            No approved discards.
+          </div>
+        </section>
+      </section>
+
+      <h2 class="section-title">Needs your attention</h2>
+      <section class="grid">
+        <section class="lane warning">
+          <div class="lane-title">
+            <h2>Unrecorded Leftovers</h2>
+            <span id="unrecordedBadge">0</span>
+          </div>
+          <p class="lane-help">
+            Archive Assistant has no record of these and they are not provable
+            duplicates. Tick the ones to move to the trash hold. Check whether
+            one is a download you never scanned.
+          </p>
+          <div id="unrecordedList" class="cards empty">
+            No unrecorded leftovers.
+          </div>
+        </section>
+
+        <section class="lane warning">
+          <div class="lane-title">
+            <h2>Leftovers Need Review</h2>
+            <span id="reviewBadge">0</span>
+          </div>
+          <p class="lane-help">
+            Non-empty leftovers stay visible and are never removed.
+          </p>
+          <div id="reviewList" class="cards empty">
+            No leftovers needing review.
           </div>
         </section>
 
@@ -107,69 +171,31 @@
           </p>
           <div id="newList" class="cards empty">No too-new items.</div>
         </section>
-
-        <section class="lane warning">
-          <div class="lane-title">
-            <h2>Leftovers Need Review</h2>
-            <span id="reviewBadge">0</span>
-          </div>
-          <p class="lane-help">
-            Non-empty leftovers stay visible. MVP never deletes them.
-          </p>
-          <div id="reviewList" class="cards empty">
-            No leftovers needing review.
-          </div>
-        </section>
       </section>
 
-      <section class="grid main-grid">
-        <section class="lane success">
-          <div class="lane-title">
-            <h2>Verified Duplicates</h2>
-            <span id="duplicateBadge">0</span>
-          </div>
-          <p class="lane-help">
-            Every media file in these folders is an exact copy of a file already
-            in your library, even though Archive Assistant has no record of the
-            folder. Nothing is removed yet; they wait for the 14-day trash hold.
-          </p>
-          <div id="duplicateList" class="cards empty">
-            No verified duplicates.
-          </div>
-        </section>
-
-        <section class="lane success">
-          <div class="lane-title">
-            <h2>Quarantine Discards</h2>
-            <span id="discardBadge">0</span>
-          </div>
-          <p class="lane-help">
-            Quarantined items you approved for discard in Archive Assistant.
-            Undecided quarantine items are never listed here. Nothing is removed
-            yet; they wait for the 14-day trash hold.
-          </p>
-          <div id="discardList" class="cards empty">
-            No approved discards.
-          </div>
-        </section>
-
-        <section class="lane warning">
-          <div class="lane-title">
-            <h2>Unrecorded Leftovers</h2>
-            <span id="unrecordedBadge">0</span>
-          </div>
-          <p class="lane-help">
-            Archive Assistant has no record of these and they are not provable
-            duplicates, so they stay put unless you choose them once the trash
-            hold exists. Check whether one is a download you never scanned.
-          </p>
-          <div id="unrecordedList" class="cards empty">
-            No unrecorded leftovers.
-          </div>
-        </section>
+      <h2 class="section-title">Trash hold</h2>
+      <section class="lane wide">
+        <div class="lane-title">
+          <h2>Held items</h2>
+          <span id="trashBadge">0</span>
+        </div>
+        <p id="trashHelp" class="lane-help">
+          Items Cleaner moved aside. Restore puts one back exactly where it was.
+          Nothing here is deleted until its hold has expired and you purge it.
+        </p>
+        <div id="trashSummary" class="detail"></div>
+        <div id="trashList" class="cards cards-wide empty">
+          Nothing is in the trash hold.
+        </div>
+        <div class="lane-footer">
+          <button id="purgeBtn" type="button" class="danger" hidden>
+            Purge expired items
+          </button>
+        </div>
       </section>
 
-      <section class="grid lower lower-grid">
+      <h2 class="section-title">Blocked and protected</h2>
+      <section class="grid grid-split">
         <section class="lane danger">
           <div class="lane-title">
             <h2>Blocked by Safety</h2>

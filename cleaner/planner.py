@@ -8,6 +8,7 @@ from .evidence import evidence_index
 from .models import CleanerPlan, PlannedAction
 from .reports import run_id, utc_now_iso
 from .scanner import scan_cleanup_candidates, scan_quarantine_discards
+from .trash import trash_category_enabled
 
 
 def _action_for_category(config: CleanerConfig, category: str) -> tuple[str, str]:
@@ -20,15 +21,20 @@ def _action_for_category(config: CleanerConfig, category: str) -> tuple[str, str
     if category == "known_harmless_trash":
         if config.dry_run:
             return "known_trash_report_only", "report_only_mvp"
-        if config.mode == "production" and config.destructive_actions_enabled and config.allow_known_trash_delete:
-            return "delete_known_trash", "allowed_by_production_gates"
+        if trash_category_enabled(config, category):
+            return "move_to_trash", "allowed_by_production_gates"
         return "blocked_no_action", "blocked_by_config"
     if category == "uncertain_leftover":
         return "report_only", "leave_visible_for_review"
-    # Picked up for cleanup, but nothing can act on them until the 14-day trash hold exists.
+    # Picked up for cleanup. They only ever move into the recoverable trash hold, and only
+    # when the production gates and ALLOW_TRASH_HOLD (plus the category's own switch) are on.
     if category in {"verified_duplicate", "quarantine_discard_approved"}:
+        if trash_category_enabled(config, category):
+            return "move_to_trash", "allowed_by_production_gates"
         return "report_only", "awaiting_trash_hold"
     if category == "unrecorded_leftover":
+        if trash_category_enabled(config, category):
+            return "move_to_trash", "requires_your_tick"
         return "report_only", "needs_your_decision"
     if category in {"quarantine_hold", "do_not_touch"}:
         return "report_only", "protected_path"
@@ -72,6 +78,11 @@ def build_plan(
                 severity=classification.severity,
                 evidence=classification.evidence,
                 details=classification.details,
+                signature={
+                    "file_count": item.file_count,
+                    "total_size_bytes": item.total_size_bytes,
+                    "max_modified_time": item.max_modified_time,
+                },
             )
         )
 

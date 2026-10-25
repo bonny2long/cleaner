@@ -109,8 +109,12 @@ class CleanerConfig:
     dashboard_host: str = "127.0.0.1"
     dashboard_port: int = 8092
     allow_empty_folder_removal: bool = False
-    allow_quarantine_routing: bool = False
+    # Moving things into the trash hold (recoverable) and purging it (the only real deletion).
+    allow_trash_hold: bool = False
+    allow_trash_purge: bool = False
+    allow_quarantine_discard: bool = False
     allow_known_trash_delete: bool = False
+    trash_hold_days: int = 14
     ignore_incoming: bool = True
     ignore_processing: bool = True
     known_trash_names: tuple[str, ...] = DEFAULT_KNOWN_TRASH_NAMES
@@ -120,6 +124,7 @@ class CleanerConfig:
     cleaner_reports_dir_override: Path | None = None
     leftover_review_dir_override: Path | None = None
     quarantine_dir_override: Path | None = None
+    trash_dir_override: Path | None = None
     allowed_origins: tuple[str, ...] = ()
 
     @classmethod
@@ -137,13 +142,17 @@ class CleanerConfig:
             dashboard_host=os.getenv("DASHBOARD_HOST", "127.0.0.1"),
             dashboard_port=_env_int("DASHBOARD_PORT", 8092),
             allow_empty_folder_removal=_env_bool("ALLOW_EMPTY_FOLDER_REMOVAL", False),
-            allow_quarantine_routing=_env_bool("ALLOW_QUARANTINE_ROUTING", False),
+            allow_trash_hold=_env_bool("ALLOW_TRASH_HOLD", False),
+            allow_trash_purge=_env_bool("ALLOW_TRASH_PURGE", False),
+            allow_quarantine_discard=_env_bool("ALLOW_QUARANTINE_DISCARD", False),
             allow_known_trash_delete=_env_bool("ALLOW_KNOWN_TRASH_DELETE", False),
+            trash_hold_days=_env_int("TRASH_HOLD_DAYS", 14),
             ignore_incoming=_env_bool("IGNORE_INCOMING", True),
             ignore_processing=_env_bool("IGNORE_PROCESSING", True),
             cleaner_reports_dir_override=_env_path("CLEANER_REPORTS_DIR", Path("")) if os.getenv("CLEANER_REPORTS_DIR") else None,
             leftover_review_dir_override=_env_path("LEFTOVER_REVIEW_DIR", Path("")) if os.getenv("LEFTOVER_REVIEW_DIR") else None,
             quarantine_dir_override=_env_path("QUARANTINE_DIR", Path("")) if os.getenv("QUARANTINE_DIR") else None,
+            trash_dir_override=_env_path("TRASH_DIR", Path("")) if os.getenv("TRASH_DIR") else None,
             allowed_origins=parse_origin_list(os.getenv("ALLOWED_ORIGINS")),
         )
 
@@ -180,6 +189,10 @@ class CleanerConfig:
         return self.quarantine_dir_override or (self.data_root / "_QUARANTINE")
 
     @property
+    def trash_dir(self) -> Path:
+        return self.trash_dir_override or (self.data_root / "_TRASH")
+
+    @property
     def reports_root(self) -> Path:
         return self.data_root / "_REPORTS"
 
@@ -213,3 +226,5 @@ class CleanerConfig:
             raise ValueError("development mode cannot enable destructive actions")
         if self.dry_run and self.destructive_actions_enabled:
             raise ValueError("DRY_RUN=true cannot enable destructive actions")
+        if self.trash_hold_days < 1:
+            raise ValueError("TRASH_HOLD_DAYS must be at least 1; the hold is what keeps removals recoverable")

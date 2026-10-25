@@ -5,7 +5,7 @@ Set-Location C:\Dev\NAS\cleaner
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-79 tests. They use temporary folders only and never touch the real data root.
+126 tests. They use temporary folders only and never touch the real data root.
 
 What they prove:
 

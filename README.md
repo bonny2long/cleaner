@@ -26,18 +26,18 @@ Cleaner never deletes files. Its only real action today is removing **empty fold
 |---|---|---|
 | `MIN_AGE_DAYS` | `30` | A leftover must be untouched for 30 days before Cleaner will consider it. Age is measured from the newest modification time anywhere inside the item. |
 | `CHECK_INTERVAL_SECONDS` | `604800` (7 days) | How often the dashboard writes a plan automatically when `AUTO_RUN=true`. |
-| Trash hold | 14 days, **planned** | Agreed design: a cleaned item moves to a trash holding area and is purged 14 days later. **Not built yet.** Today, empty-folder removal is immediate once approved. |
+| `TRASH_HOLD_DAYS` | `14` | How long an item moved to the trash hold stays recoverable before it may be purged. Must be at least 1. Empty-folder removal is not held (an empty folder has nothing to lose). |
 
 ## What Cleaner classifies
 
 | Category | Meaning | Action today |
 |---|---|---|
 | `safe_empty_folder` | Folder tree with no files, backed by a verified Archive Assistant move record | Removable when production gates are on |
-| `known_harmless_trash` | Only junk files such as `Thumbs.db`, `.DS_Store`, `.tmp`, or CD-rip logs (`.log`, `.cue`, `.accurip`, `.m3u`, `DR<n>.txt`, `auCDtect.txt`) left after a verified move | Report only |
+| `known_harmless_trash` | Only junk files such as `Thumbs.db`, `.DS_Store`, `.tmp`, or CD-rip logs (`.log`, `.cue`, `.accurip`, `.m3u`, `DR<n>.txt`, `auCDtect.txt`) left after a verified move | Moves to the trash hold when `ALLOW_TRASH_HOLD` and `ALLOW_KNOWN_TRASH_DELETE` are on; otherwise report only |
 | `uncertain_leftover` | Anything else left behind (sidecars, logs, unmoved media) | Report only |
-| `verified_duplicate` | A folder Archive Assistant has **no record of**, where every media file is a byte-for-byte copy (SHA-256) of a file already in a final library. Cover art, notes, rip logs and known junk may sit beside them | Report only, until the trash hold exists |
-| `unrecorded_leftover` | A folder Archive Assistant has no record of that is not a provable duplicate (a media file not in any library, an unrecognised file type, or only artwork) | Report only. Needs your decision; never picked up on its own |
-| `quarantine_discard_approved` | A quarantined item you approved for discard in Archive Assistant, whose files still match the inventory recorded at that moment | Report only, until the trash hold exists |
+| `verified_duplicate` | A folder Archive Assistant has **no record of**, where every media file is a byte-for-byte copy (SHA-256) of a file already in a final library. Cover art, notes, rip logs and known junk may sit beside them | Moves to the trash hold when `ALLOW_TRASH_HOLD` is on; otherwise report only |
+| `unrecorded_leftover` | A folder Archive Assistant has no record of that is not a provable duplicate (a media file not in any library, an unrecognised file type, or only artwork) | Report only until you tick it on the dashboard, then moves to the trash hold. Never picked up on its own |
+| `quarantine_discard_approved` | A quarantined item you approved for discard in Archive Assistant, whose files still match the inventory recorded at that moment | Moves to the trash hold when `ALLOW_TRASH_HOLD` and `ALLOW_QUARANTINE_DISCARD` are on and the waiting period is over; otherwise report only |
 | `quarantine_hold` | Anything else in `_QUARANTINE`, including items nobody decided about | Never touched |
 | `do_not_touch` | Final libraries, Photos, Documents, Projects, Backups, active upload lanes | Never touched |
 | `blocked_too_new` | Younger than `MIN_AGE_DAYS` | Waits |
@@ -48,11 +48,11 @@ Cleaner scans `_INGEST/ready`, `_INGEST/leftover-review`, `_INGEST/failed`, `_ST
 
 ### What Cleaner picks up beyond empty folders
 
-Three kinds of leftover are now recognised and shown on their own dashboard lanes. They are **report-only** today; the 14-day trash hold is what will let Cleaner act on them.
+Three kinds of leftover are recognised and shown on their own dashboard lanes. They are **report-only** unless the trash hold is switched on (see below), and even then they are only moved aside, never deleted.
 
 - **Verified duplicates.** Proven by content, not by name, so a `- Copy` folder is recognised even though Archive Assistant never recorded it. The folder must be at least `MIN_AGE_DAYS` old.
 - **Quarantine discards.** Only items whose newest Archive Assistant decision is `discard_approved` and whose files still match the recorded inventory. Undecided, restored or revoked items are never picked up. A decision made less than `MIN_AGE_DAYS` ago is shown with the date it becomes eligible.
-- **Unrecorded leftovers.** Listed so nothing sits unnoticed, but never picked up automatically: it could be a download you have not scanned yet.
+- **Unrecorded leftovers.** Listed so nothing sits unnoticed, but never picked up automatically: it could be a download you have not scanned yet. They move to the trash hold only when you tick them.
 
 Checking a folder against the libraries means hashing files. The dashboard spends at most 5 seconds per refresh on it and shows the rest as "not yet checked" (hashes are remembered, so it finishes over a few refreshes). A written plan (**Run dry plan**, the CLI, the weekly run) checks everything.
 
@@ -86,7 +86,32 @@ Even then, a removal must pass every check at the moment it runs:
 
 Removal deletes folders bottom-up with `rmdir` only. If a file appears mid-way, the removal stops. Each run writes `execution-<run id>.json` listing every removed folder so it can be recreated.
 
-`ALLOW_KNOWN_TRASH_DELETE` and `ALLOW_QUARANTINE_ROUTING` exist in configuration but no working action is wired to them yet. Leave them `false`.
+## The trash hold
+
+Nothing Cleaner picks up beyond empty folders is deleted. Instead it is **renamed** into `_TRASH/<trash run>/<its original path>` on the same disk (instant, and Cleaner never copies then deletes). A `trash-manifest.json` in each run folder records what the item was, why it was taken, the AA evidence, an inventory of every file, and when it may be purged (`moved_at + TRASH_HOLD_DAYS`). The intent is written to the manifest before the rename.
+
+| Setting | What it allows (each also needs the production gates) |
+|---|---|
+| `ALLOW_TRASH_HOLD` | Moving verified duplicates, and strays you tick, into the hold. Required for everything below. |
+| `ALLOW_QUARANTINE_DISCARD` | Also moving quarantine items you approved for discard in Archive Assistant, once their waiting period is over. |
+| `ALLOW_KNOWN_TRASH_DELETE` | Also moving folders that hold only CD-rip logs and other known junk. |
+| `ALLOW_TRASH_PURGE` | Permanently deleting items whose hold has expired. The only setting that deletes. |
+
+An item moves only when **all** of these hold:
+
+- it is in a plan report you wrote less than 24 hours ago, with the same category (a fresh plan re-checks every duplicate by content, so one whose library copy has gone is not moved);
+- strays were also ticked by you; discards are past their waiting period;
+- the folder still has the same file count, size and newest change as when it was classified;
+- it is inside `_INGEST/ready`, `_INGEST/failed` or `_STAGING` (or `_QUARANTINE/<kind>/<item>` for discards), is not a lane root, quarantine container, link or junction, and nothing already exists at its place in the hold;
+- the hold is on the same disk.
+
+**Restore** puts an item back exactly where it was and is always available (no gates, it deletes nothing). It refuses if anything now exists at the original path.
+
+**Purge** deletes an item only if you list it, `ALLOW_TRASH_PURGE` is on, its hold has expired, it is still `in_trash`, and its files still match the recorded inventory (an item that was altered while held is left alone). Each purge writes `purge-<id>.json`. Cleaner never purges on its own; a held item stays until you purge it.
+
+Moves write `trash-<run>.json` next to the other reports. Only one cleanup action runs at a time; a second request gets a 409.
+
+CLI equivalents: `trash-move --run-id ... [--tick "<relative path>"]`, `trash-list`, `restore <trash run> <relative path>`, `purge <trash run> <relative path>...`.
 
 ## Evidence Cleaner reads
 
@@ -110,21 +135,23 @@ Copy-Item .env.example .env   # then set DATA_ROOT=C:/NAS-Local/nas-data
 .\.venv\Scripts\python.exe -m cleaner.cli inspect                           # raw scan items
 .\.venv\Scripts\python.exe -m cleaner.cli ensure-folders                    # create the shared folder layout
 .\.venv\Scripts\python.exe -m cleaner.cli execute --run-id cleaner-YYYYMMDD-HHMMSS
+.\.venv\Scripts\python.exe -m cleaner.cli trash-list                         # what is held, and until when
 .\.venv\Scripts\python.exe -m pytest -q                                     # tests
 ```
 
-On the dashboard, **Run dry plan** (or **Write plan to review** when execution is enabled) writes a plan report. **Remove N empty folders** appears only when all production gates are on, and acts only on the plan you just wrote.
+On the dashboard, **Run dry plan** (or **Write plan to review** when execution is enabled) writes a plan report. **Remove N empty folders** appears only when all production gates are on, and acts only on the plan you just wrote. With `ALLOW_TRASH_HOLD` on, **Move N to trash hold** does the same for the trash candidates (strays need their tick box), and the **Trash Hold** panel lists held items with **Restore** and, when `ALLOW_TRASH_PURGE` is on, **Purge expired items**.
 
 ## Known limitations
 
 - When one download produced several move records (for example a discography split into albums), Cleaner keeps only one record per source folder when checking destinations.
 - Cleaner does not yet ask Archive Assistant whether any batch from a folder is still pending review. A folder that still holds unmoved media is reported as `uncertain_leftover`, never removed, because it is not empty.
 - Cleaner reads `discard_approved` disposition records but ignores `rejected` ones, so a rejected batch's files are reported, not cleaned.
-- The 14-day trash hold is not built. Until it is, duplicates, discards and unrecorded leftovers are reported but nothing acts on them.
+- The trash hold is a folder on the same disk, not a separate backup. Held items still take space until purged. Moving a hold to another disk is deliberately unsupported.
+- `_TRASH` sits beside `_INGEST` in the data root. Archive Assistant scans only `_INGEST` and BM Radio only its configured library folders, so neither reads it; keep it that way if you add scan roots.
 
 ## Roadmap
 
 1. Read all move records per source folder and Archive Assistant disposition records.
 2. Ask Archive Assistant for pending batches before acting on a folder.
 3. Add a Cleaner SQLite ledger for first-seen dates, plan identity, and the action log.
-4. Add the trash holding area with a 14-day purge, then known-junk cleanup and approved quarantine discards.
+4. Ask Archive Assistant for pending batches before moving anything, and add the SQLite ledger (items 2 and 3).
