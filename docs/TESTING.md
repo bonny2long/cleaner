@@ -5,7 +5,7 @@ Set-Location C:\Dev\NAS\cleaner
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-55 tests. They use temporary folders only and never touch the real data root.
+63 tests. They use temporary folders only and never touch the real data root.
 
 What they prove:
 
@@ -34,4 +34,7 @@ execution never touches a rip-log folder, even with every production gate on
 a POST from another site is refused (403) before it can write a plan or start an execution
 the dashboard's own address, listed LAN origins and plain clients such as curl still work
 a refused request that carries a large body still gets a clean 403, never a dropped connection
+manifests are found at every layout Archive Assistant writes, and only inside the evidence folders
+the evidence scan lists each folder once and never opens individual files
+the dashboard may reuse evidence for 60 seconds; written plans and executions never do
 ```

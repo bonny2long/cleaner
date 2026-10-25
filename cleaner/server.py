@@ -28,8 +28,14 @@ def _json_default(value: Any) -> Any:
     return str(value)
 
 
+# The dashboard refreshes every 30 seconds. Showing evidence up to a minute old keeps it
+# from rescanning every library on each refresh. Plans that are written or executed
+# always read fresh evidence (see run_dry_plan and run_execution).
+DASHBOARD_EVIDENCE_CACHE_SECONDS = 60
+
+
 def build_dashboard_payload(config: CleanerConfig) -> dict[str, Any]:
-    plan = build_plan(config)
+    plan = build_plan(config, evidence_max_age_seconds=DASHBOARD_EVIDENCE_CACHE_SECONDS)
     events = read_recent_jsonl(config.cleaner_log_path, 80)
     lanes: dict[str, list[dict[str, Any]]] = {
         "ready_to_clean_later": [],
@@ -168,7 +174,7 @@ class CleanerHandler(BaseHTTPRequestHandler):
             self._send_json(build_dashboard_payload(self.config))
             return
         if path == "/api/plan":
-            self._send_json(build_plan(self.config).to_dict())
+            self._send_json(build_plan(self.config, evidence_max_age_seconds=DASHBOARD_EVIDENCE_CACHE_SECONDS).to_dict())
             return
         if path == "/":
             self._send_file(WEB_DIR / "index.html")
