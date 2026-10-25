@@ -74,6 +74,15 @@ def classify_item(config: CleanerConfig, item: ScanItem, evidence_by_source: dic
     if item.empty and item.kind == "directory":
         return Classification("safe_empty_folder", "source folder is empty after approved/rejected Archive Assistant decision", evidence=evidence, severity="info")
 
+    if item.known_trash_only and item.rip_sidecar_count:
+        return Classification(
+            "known_harmless_trash",
+            "only CD-rip logs (.log, .cue, .accurip, .m3u, DR and auCDtect reports) and other known junk remain; "
+            "Archive Assistant already moved this release. Report only until the trash hold exists",
+            evidence=evidence,
+            severity="info",
+        )
+
     if item.known_trash_only:
         return Classification("known_harmless_trash", "only known harmless trash files detected; report only in MVP", evidence=evidence, severity="info")
 

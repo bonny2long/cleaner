@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Removed the `move_to_leftover_review` action and the `ALLOW_LEFTOVER_REVIEW_MOVES` setting. The planner only offered it when destructive actions were off and the executor only ran it when they were on, so it could never run. Uncertain leftovers are report-only. A leftover `ALLOW_LEFTOVER_REVIEW_MOVES` line in a `.env` is ignored.
+- CD-rip logs (`.log`, `.cue`, `.accurip`, `.m3u`, `DR<n>.txt`, `auCDtect.txt`) left beside a release after Archive Assistant moved the audio are now labeled `known_harmless_trash` instead of `uncertain_leftover`. Still report-only: nothing is deleted, and file cleanup waits for the 14-day trash hold. A folder with any other file, no move evidence, or an age under `MIN_AGE_DAYS` is not labeled.
+- Tests: 33.
 
 ## 0.2.0 - 2026-09-27
 

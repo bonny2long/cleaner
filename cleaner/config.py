@@ -17,6 +17,21 @@ DEFAULT_KNOWN_TRASH_SUFFIXES = (
     ".bak",
 )
 
+# CD-rip logs that stay beside a release after Archive Assistant moves the audio.
+DEFAULT_RIP_SIDECAR_SUFFIXES = (
+    ".log",
+    ".cue",
+    ".accurip",
+    ".m3u",
+)
+
+# Matched against the whole file name, ignoring case. "DR8.txt" is a dynamic-range
+# report; a plain "DR*.txt" wildcard would also catch names like "Dracula.txt".
+DEFAULT_RIP_SIDECAR_NAME_PATTERNS = (
+    r"DR\d+\.txt",
+    r"auCDtect\.txt",
+)
+
 SHARED_NAS_FOLDERS = (
     "_INGEST/incoming",
     "_INGEST/intake-processing",
@@ -98,6 +113,8 @@ class CleanerConfig:
     ignore_processing: bool = True
     known_trash_names: tuple[str, ...] = DEFAULT_KNOWN_TRASH_NAMES
     known_trash_suffixes: tuple[str, ...] = DEFAULT_KNOWN_TRASH_SUFFIXES
+    rip_sidecar_suffixes: tuple[str, ...] = DEFAULT_RIP_SIDECAR_SUFFIXES
+    rip_sidecar_name_patterns: tuple[str, ...] = DEFAULT_RIP_SIDECAR_NAME_PATTERNS
     cleaner_reports_dir_override: Path | None = None
     leftover_review_dir_override: Path | None = None
     quarantine_dir_override: Path | None = None

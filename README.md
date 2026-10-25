@@ -33,7 +33,7 @@ Cleaner never deletes files. Its only real action today is removing **empty fold
 | Category | Meaning | Action today |
 |---|---|---|
 | `safe_empty_folder` | Folder tree with no files, backed by a verified Archive Assistant move record | Removable when production gates are on |
-| `known_harmless_trash` | Only junk files such as `Thumbs.db`, `.DS_Store`, `.tmp` | Report only |
+| `known_harmless_trash` | Only junk files such as `Thumbs.db`, `.DS_Store`, `.tmp`, or CD-rip logs (`.log`, `.cue`, `.accurip`, `.m3u`, `DR<n>.txt`, `auCDtect.txt`) left after a verified move | Report only |
 | `uncertain_leftover` | Anything else left behind (sidecars, logs, unmoved media) | Report only |
 | `quarantine_hold` | Anything in `_QUARANTINE` | Never touched |
 | `do_not_touch` | Final libraries, Photos, Documents, Projects, Backups, active upload lanes | Never touched |

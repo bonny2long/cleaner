@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 from pathlib import Path
 
@@ -21,17 +22,30 @@ def _is_known_trash(path: Path, config: CleanerConfig) -> bool:
     return name_match or suffix_match
 
 
-def _dir_stats(path: Path, config: CleanerConfig) -> tuple[int, int, int, float, bool, int]:
+def _is_rip_sidecar(path: Path, config: CleanerConfig) -> bool:
+    if path.suffix.casefold() in {suffix.casefold() for suffix in config.rip_sidecar_suffixes}:
+        return True
+    return any(re.fullmatch(pattern, path.name, re.IGNORECASE) for pattern in config.rip_sidecar_name_patterns)
+
+
+def _dir_stats(path: Path, config: CleanerConfig) -> tuple[int, int, int, float, bool, int, int]:
     file_count = 0
     dir_count = 0
     total_size = 0
     max_mtime = path.stat().st_mtime
     trash_only = True
     hidden_or_sidecar = 0
+    rip_sidecars = 0
 
     if path.is_file():
         stat = path.stat()
-        return 1, 0, stat.st_size, stat.st_mtime, _is_known_trash(path, config), int(path.name.startswith("."))
+        is_rip = _is_rip_sidecar(path, config)
+        return (
+            1, 0, stat.st_size, stat.st_mtime,
+            _is_known_trash(path, config) or is_rip,
+            int(path.name.startswith(".")),
+            int(is_rip),
+        )
 
     for root, dirs, files in os.walk(path):
         root_path = Path(root)
@@ -49,13 +63,15 @@ def _dir_stats(path: Path, config: CleanerConfig) -> tuple[int, int, int, float,
             file_count += 1
             total_size += stat.st_size
             max_mtime = max(max_mtime, stat.st_mtime)
-            if not _is_known_trash(item, config):
+            if _is_rip_sidecar(item, config):
+                rip_sidecars += 1
+            elif not _is_known_trash(item, config):
                 trash_only = False
             if filename.startswith(".") or item.suffix.casefold() in {".nfo", ".srt", ".sub", ".idx", ".cue", ".log"}:
                 hidden_or_sidecar += 1
     if file_count == 0:
         trash_only = False
-    return file_count, dir_count, total_size, max_mtime, trash_only, hidden_or_sidecar
+    return file_count, dir_count, total_size, max_mtime, trash_only, hidden_or_sidecar, rip_sidecars
 
 
 def _scan_area(config: CleanerConfig, area: str, root: Path, now: float) -> list[ScanItem]:
@@ -68,7 +84,7 @@ def _scan_area(config: CleanerConfig, area: str, root: Path, now: float) -> list
         except OSError:
             continue
         kind = "file" if path.is_file() else "directory"
-        file_count, dir_count, total_size, max_mtime, trash_only, hidden_or_sidecar = _dir_stats(path, config)
+        file_count, dir_count, total_size, max_mtime, trash_only, hidden_or_sidecar, rip_sidecars = _dir_stats(path, config)
         # A folder whose whole tree holds no files (only empty disc/sub folders,
         # e.g. "CD 1" left behind after a move) is empty for cleanup purposes.
         empty = path.is_dir() and file_count == 0
@@ -89,6 +105,7 @@ def _scan_area(config: CleanerConfig, area: str, root: Path, now: float) -> list
                 age_days=age_days,
                 known_trash_only=trash_only,
                 hidden_or_sidecar_count=hidden_or_sidecar,
+                rip_sidecar_count=rip_sidecars,
             )
         )
     return items
