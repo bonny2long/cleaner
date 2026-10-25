@@ -14,6 +14,7 @@ touch _QUARANTINE or _INGEST/leftover-review
 act without Archive Assistant move evidence
 act on anything younger than MIN_AGE_DAYS (30)
 act on anything not in a plan a person reviewed
+act on a POST from a web page on another site (Origin must be loopback or listed in ALLOWED_ORIGINS)
 ```
 
 ## Cleaner may write
