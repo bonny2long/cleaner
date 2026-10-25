@@ -37,10 +37,11 @@ def _action_for_category(config: CleanerConfig, category: str) -> tuple[str, str
     return "report_only", "no_action_default"
 
 
-def build_plan(config: CleanerConfig, write_report: bool = False) -> CleanerPlan:
+def build_plan(config: CleanerConfig, write_report: bool = False, evidence_max_age_seconds: float = 0) -> CleanerPlan:
+    """Build a plan. Evidence is read fresh unless the caller (the dashboard) allows a short-lived cache."""
     config.validate()
     config.ensure_shared_directories()
-    evidence = evidence_index(config)
+    evidence = evidence_index(config, max_age_seconds=evidence_max_age_seconds)
     items = scan_cleanup_candidates(config)
     classified = classify_items(config, items, evidence)
 

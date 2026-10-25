@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -16,20 +19,42 @@ def _normalize_relative(value: str | Path, data_root: Path) -> str:
         return str(value).replace("\\", "/").lstrip("./")
 
 
+# Archive Assistant writes move manifests inside the final libraries
+# (<release folder>/metadata/move_manifest.json) and collection manifests under
+# <Media>/Metadata/move_manifests. Nothing else is evidence, so Cleaner looks only
+# here instead of walking the whole data root (Backups, Photos, ingest lanes, ...).
+EVIDENCE_ROOTS = ("Music", "Movies", "TV", "Books", "Audiobooks", "_REPORTS/move_manifests")
+# Deepest library layout is Music/Library/FLAC/<Artist>/<Album>/metadata (6 levels).
+MAX_EVIDENCE_DEPTH = 8
+
+
+def _is_manifest_name(name: str) -> bool:
+    return name == "move_manifest.json" or name.endswith("_move_manifest.json")
+
+
 def _manifest_files(data_root: Path) -> list[Path]:
-    patterns = ["**/move_manifest.json", "**/*_move_manifest.json"]
-    seen: set[Path] = set()
+    """Find move manifests by listing folders only; individual files are never opened or stat'ed."""
     found: list[Path] = []
-    for pattern in patterns:
-        for path in data_root.glob(pattern):
-            if path in seen or not path.is_file():
+    for relative in EVIDENCE_ROOTS:
+        root = data_root / relative
+        if not root.is_dir():
+            continue
+        stack = [(root, len(Path(relative).parts))]
+        while stack:
+            folder, depth = stack.pop()
+            try:
+                with os.scandir(folder) as entries:
+                    for entry in entries:
+                        try:
+                            if entry.is_dir(follow_symlinks=False):
+                                if depth < MAX_EVIDENCE_DEPTH:
+                                    stack.append((Path(entry.path), depth + 1))
+                            elif _is_manifest_name(entry.name) and entry.is_file():
+                                found.append(Path(entry.path))
+                        except OSError:
+                            continue
+            except OSError:
                 continue
-            # Ignore Cleaner's own reports. They are not Archive Assistant move evidence.
-            parts = {part.casefold() for part in path.parts}
-            if "cleaner" in parts and "_reports" in parts:
-                continue
-            seen.add(path)
-            found.append(path)
     return sorted(found, key=lambda p: str(p).casefold())
 
 
@@ -110,10 +135,37 @@ def load_archive_evidence(config: CleanerConfig) -> list[EvidenceRecord]:
     return evidence
 
 
-def evidence_index(config: CleanerConfig) -> dict[str, EvidenceRecord]:
+_cache_lock = threading.Lock()
+_cache: dict[str, tuple[float, dict[str, EvidenceRecord]]] = {}
+
+
+def _now() -> float:
+    return time.monotonic()
+
+
+def clear_evidence_cache() -> None:
+    with _cache_lock:
+        _cache.clear()
+
+
+def evidence_index(config: CleanerConfig, max_age_seconds: float = 0) -> dict[str, EvidenceRecord]:
+    """Index move evidence by source path.
+
+    ``max_age_seconds=0`` (the default) always reads the disk. The dashboard passes a
+    small value so its 30-second refresh does not rescan the libraries every time;
+    writing a plan and executing never use the cache.
+    """
+    key = str(config.data_root)
+    if max_age_seconds > 0:
+        with _cache_lock:
+            cached = _cache.get(key)
+        if cached is not None and _now() - cached[0] <= max_age_seconds:
+            return cached[1]
     index: dict[str, EvidenceRecord] = {}
     for record in load_archive_evidence(config):
         index[record.source_path] = record
         # Also allow matching children under a moved source root.
         index[record.source_path.rstrip("/")] = record
+    with _cache_lock:
+        _cache[key] = (_now(), index)
     return index

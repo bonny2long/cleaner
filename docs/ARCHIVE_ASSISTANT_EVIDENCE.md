@@ -12,7 +12,7 @@ Music|Books|Movies|Audiobooks/Metadata/move_manifests/<date>_<batch>_<name>_move
 _REPORTS/move_manifests/<date>_<batch>_move_manifest.json
 ```
 
-Cleaner finds both `move_manifest.json` and `*_move_manifest.json` anywhere under the data root, except its own reports. Fields Cleaner uses:
+Cleaner finds both `move_manifest.json` and `*_move_manifest.json`, but only under `Music`, `Movies`, `TV`, `Books`, `Audiobooks` and `_REPORTS/move_manifests`, down to 8 folder levels. It lists folders only and never opens other files. A manifest copy anywhere else (Backups, Photos, ingest lanes, Cleaner's own reports) is not evidence. If Archive Assistant ever writes manifests somewhere new, add that folder to `EVIDENCE_ROOTS` in `cleaner/evidence.py`. The dashboard reuses what it found for up to 60 seconds; writing or executing a plan always rescans. Fields Cleaner uses:
 
 ```text
 source_path          original ingest folder, relative to the data root

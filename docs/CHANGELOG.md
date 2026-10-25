@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased - Faster evidence scan
+
+- Move manifests are now found by one folder-only pass over `Music`, `Movies`, `TV`, `Books`, `Audiobooks` and `_REPORTS/move_manifests` (8 levels deep) instead of two whole-data-root globs. Measured on 3,000 synthetic albums: about 4x faster, same 3,000 manifests found; on the real data root the same 7.
+- Manifests outside those folders (for example a copy in `Backups`) no longer count as evidence.
+- The dashboard and `GET /api/plan` reuse the evidence for up to 60 seconds, so its 30-second refresh does not rescan the libraries each time. Writing a plan (`/api/run-dry-plan`) and executing always read fresh evidence.
+- Tests: 26.
+
 ## 0.2.0 - 2026-09-27
 
 - Default `MIN_AGE_DAYS` is now 30 (was 14), matching the agreed timing model: weekly check, 30-day age gate, planned 14-day trash hold.
